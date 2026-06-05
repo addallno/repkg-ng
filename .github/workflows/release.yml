@@ -3,54 +3,54 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'alpha*'
       - 'v*'
       - '[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
 
+env:
+  DOTNET_VERSION: 8.0.x
+
 jobs:
-  build:
+  # ── Self-contained builds (no runtime needed) ──
+  self-contained:
     strategy:
       matrix:
         include:
           - rid: win-x64
             os: windows-latest
             ext: .exe
+            archive: zip
           - rid: linux-x64
             os: ubuntu-latest
             ext: ''
+            archive: tar.gz
           - rid: linux-arm64
             os: ubuntu-latest
             ext: ''
+            archive: tar.gz
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Publish net8.0 ${{ matrix.rid }}
+      - name: Publish ${{ matrix.rid }} (self-contained)
         run: |
           dotnet publish RePKG/RePKG.csproj \
-            -c Release \
-            -f net8.0 \
-            -r ${{ matrix.rid }} \
-            --self-contained \
-            -o ./publish
+            -c Release -f net8.0 -r ${{ matrix.rid }} \
+            --self-contained -o ./publish
 
-      - name: Prepare archive
+      - name: Package archive
         run: |
           cd publish
           mv RePKG${{ matrix.ext }} repkg-${{ matrix.rid }}${{ matrix.ext }}
-          rm -f *.pdb *.config
+          rm -f *.pdb *.config *.xml
           cd ..
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          if [ "${{ matrix.archive }}" = "zip" ]; then
             7z a repkg-${{ matrix.rid }}.zip ./publish/*
           else
             tar czf repkg-${{ matrix.rid }}.tar.gz -C publish .
@@ -58,25 +58,88 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: repkg-${{ matrix.rid }}
+          name: self-contained-${{ matrix.rid }}
           path: repkg-${{ matrix.rid }}.*
 
+  # ── Framework-dependent portable build (~1.5MB) ──
+  portable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish (framework-dependent, any cpu)
+        run: |
+          dotnet publish RePKG/RePKG.csproj \
+            -c Release -f net8.0 \
+            -o ./publish
+          rm -f ./publish/*.pdb ./publish/*.config ./publish/*.xml
+
+      - name: Package portable zip
+        run: |
+          cd publish
+          mv RePKG repkg
+          cd ..
+          tar czf repkg-portable.tar.gz -C publish .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable
+          path: repkg-portable.tar.gz
+
+  # ── NuGet package ──
+  nuget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Pack NuGet
+        run: |
+          dotnet pack RePKG/RePKG.csproj \
+            -c Release \
+            -o ./nupkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget
+          path: ./nupkg/*.nupkg
+
+  # ── Aggregate & Release ──
   release:
-    needs: [build]
+    needs: [self-contained, portable, nuget]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
 
-      - name: Upload Release
+      - name: List artifacts
+        run: ls -lh
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          name: RePKG ${{ github.ref_name }}
           files: |
             repkg-win-x64.*
             repkg-linux-x64.*
             repkg-linux-arm64.*
-          fail_on_unmatched_files: true
+            repkg-portable.*
+          fail_on_unmatched_files: false
+
+      - name: Push NuGet to GitHub Packages
+        run: |
+          dotnet nuget push *.nupkg \
+            --source "https://nuget.pkg.github.com/addallno/index.json" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate

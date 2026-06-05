@@ -3,8 +3,16 @@
         <RootNamespace>RePKG</RootNamespace>
         <OutputType>Exe</OutputType>
         <TargetFrameworks>net472;net8.0</TargetFrameworks>
-        <Version>4.1.0</Version>
+        <Version>0.5.0</Version>
         <Copyright>Copyright © NotScuffed 2025</Copyright>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>repkg</ToolCommandName>
+        <PackageId>RePKG</PackageId>
+        <Authors>NotScuffed;addallno</Authors>
+        <Description>Wallpaper Engine PKG/TEX packer, extractor and converter. Supports pack/info/extract commands, video textures, and Android .mpkg format.</Description>
+        <PackageProjectUrl>https://github.com/addallno/repkg</PackageProjectUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageTags>wallpaper-engine;tex;pkg;mpkg;android-wallpaper</PackageTags>
     </PropertyGroup>
     
     <ItemGroup>
