@@ -100,9 +100,12 @@ jobs:
 
       - name: Pack NuGet
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION%%-*}"
           dotnet pack RePKG/RePKG.csproj \
             -c Release \
             -p:TargetFramework=net8.0 \
+            -p:Version=$VERSION \
             -o ./nupkg
 
       - uses: actions/upload-artifact@v4
