@@ -5,7 +5,7 @@
         <TargetFrameworks>net472;net8.0</TargetFrameworks>
         <Version>0.5.0</Version>
         <Copyright>Copyright © NotScuffed 2025</Copyright>
-        <PackAsTool>true</PackAsTool>
+        <PackAsTool Condition="'$(TargetFramework)' != 'net472'">true</PackAsTool>
         <ToolCommandName>repkg</ToolCommandName>
         <PackageId>RePKG</PackageId>
         <Authors>NotScuffed;addallno</Authors>
