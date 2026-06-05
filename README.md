@@ -2,6 +2,9 @@
 
 > 基于 [notscuffed/repkg](https://github.com/notscuffed/repkg) 的社区维护分支。
 > 原作者已超过 15 个月未活动，此分支**可能不会持续跟进**，甚至可能不会再有更新。请自行评估使用风险。
+>
+> 我们向上游提交了 PR [#73](https://github.com/notscuffed/repkg/pull/73) 包含了以下所有改动，
+> 但上游长期不活跃，因此在此 fork 中维护。
 
 ## 功能
 
@@ -13,6 +16,8 @@
 | `pack` | 目录 → `.pkg`/`.mpkg`；图片/视频 → `.tex` |
 
 ### pack 命令（新增）
+回应 [#72](https://github.com/notscuffed/repkg/issues/72) — 打包功能请求。
+
 ```sh
 # 目录 → PKG/MPKG
 repkg pack ./mywallpaper -o output.pkg          # 桌面版 (PKGV0005)
@@ -27,13 +32,17 @@ repkg pack video.mp4 -o video.tex                # MP4 → 视频纹理
 repkg pack input.png -f R8 -o output.tex         # 指定格式
 ```
 
+- 支持 PNG/GIF/BMP/JPEG/WebP/TGA 图片 → TEX
+- 支持 MP4/WebM/MOV/AVI/MKV/FLV/WMV 视频 → TEX 视频纹理
+- `-f` 参数可指定像素格式 (RGBA8888/R8/R88/BC1/BC3/BC5/BC7)
+
 **自动 Magic 识别规则：**
 - 输出后缀 `.mpkg` → 魔术字 `PKGM0019`（Android 壁纸引擎 "ID版"）
 - 输出后缀 `.pkg` → 魔术字 `PKGV0005`（桌面版 Wallpaper Engine）
 - 可通过 `-m` 参数覆盖
 
 ### extract / info 命令改进
-- 现在支持 `.mpkg` 后缀（原版只认 `.pkg`）
+- 现在支持 `.mpkg` 后缀（原版只认 `.pkg`）— 回应 [#34](https://github.com/notscuffed/repkg/issues/34)
 - 目录模式下自动同时扫描 `.pkg` 和 `.mpkg`
 
 ### 视频 TEX 支持
@@ -41,8 +50,42 @@ repkg pack input.png -f R8 -o output.tex         # 指定格式
 - 使用 TEXB0004 V4 容器 + V3 mipmap 混合格式，与官方一致
 - Android 兼容：推荐 H.264 Baseline + yuv420p + 1920×1080
 
-### Bugfix
-- **`WriteStringI32Size`**：修复中文字符路径写入时长度计算错误（写字符数而非字节数），解决包含中文的文件名导致 PKG 头损坏的问题
+### 多框架跨平台支持
+回应 [#58](https://github.com/notscuffed/repkg/issues/58)、[#29](https://github.com/notscuffed/repkg/issues/29) — Linux / 跨平台支持。
+
+新增 `net8.0` 和 `net9.0` 目标框架，支持以下平台：
+- **Windows** x64/x86/arm64
+- **Linux** x64/arm64 (含 Termux/TermuxProot)
+- **macOS** x64/arm64 (Apple Silicon)
+
+```sh
+# 示例：发布 Linux ARM64 单文件
+dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r linux-arm64 --self-contained -o ./publish
+
+# 示例：发布 Windows x64 单文件
+dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r win-x64 --self-contained -o ./publish
+```
+
+### 修复的 Bug
+
+#### TexToImageConverter 图片裁剪/缩放崩溃
+回应 [#18](https://github.com/notscuffed/repkg/issues/18) — Crop rectangle should be smaller than source bounds。
+
+原版代码在提取某些 TEX 文件时，如果裁剪矩形超出图片边界，会抛出 `ArgumentException` 导致程序崩溃退出。
+修复后：先执行缩放操作（Resize）再裁剪（Crop），确保裁剪矩形总是在图片边界内。
+同时移除了图片裁边（AutoOrient），提取更稳定。不再因个别错误的 TEX 文件而中断整个解包流程。
+
+#### WriteStringI32Size 中文字符路径写入错误
+回应 [#65](https://github.com/notscuffed/repkg/issues/65)、[#63](https://github.com/notscuffed/repkg/issues/63) — Size cannot be negative。
+
+`BinaryWriter.WriteStringI32Size` 在写入字符串长度时使用了 `string.Length`（字符数），
+而读取时 `ReadStringI32Size` 以字节数为准。当中文字符路径（UTF-8 多字节）出现时，
+写入的长度小于实际读取需要的长度，导致后续读取错位甚至读到负数长度。
+修复为 `Encoding.UTF8.GetByteCount()` 后，包含中文路径的 PKG 文件可以正确写入和读取。
+
+#### 非 MP4 V4 纹理容器格式
+当使用 V4 容器（TEXB0004）但内容不是 MP4 视频时，回退使用 V3 mipmap 数据结构，
+使转换后的 TEX 格式与官方 Wallpaper Engine 输出一致。
 
 ## 编译
 
@@ -59,7 +102,17 @@ dotnet build RePKG/RePKG.csproj -c Debug
 
 ### 跨平台发布（单文件）
 ```sh
+# Windows x64
+dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r win-x64 --self-contained -o ./publish
+
+# Linux x64
+dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r linux-x64 --self-contained -o ./publish
+
+# Linux ARM64 (Android Termux)
 dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r linux-arm64 --self-contained -o ./publish
+
+# macOS Apple Silicon
+dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r osx-arm64 --self-contained -o ./publish
 ```
 
 ## 使用示例
@@ -74,26 +127,25 @@ dotnet RePKG.dll extract wallpaper.pkg -o ./output
 dotnet RePKG.dll extract wallpaper.mpkg -o ./output --no-tex-convert
 
 # 打包
-dotnet RePKG.dll pack ./output -o wallpaper.mpkg    # Android
-dotnet RePKG.dll pack ./output -o wallpaper.pkg     # 桌面
-dotnet RePKG.dll pack video.mp4                      # → video.tex
-dotnet RePKG.dll pack image.png -f R8                # → image.tex (R8格式)
+dotnet RePKG.dll pack ./output -o wallpaper.mpkg    # Android .mpkg
+dotnet RePKG.dll pack ./output -o wallpaper.pkg     # 桌面 .pkg
+dotnet RePKG.dll pack video.mp4                      # MP4 → video.tex
+dotnet RePKG.dll pack image.png -f R8                # PNG → R8纹理
 ```
 
-## 与上游的差异
+## 与上游的差异 / Issues 对应
 
-新增功能：
-- `pack` 命令（目录→PKG/MPKG，文件→TEX）
-- `ImageToTexConverter`（图片/GIF/视频→TEX 转换器）
-- V4 纹理容器写入器（TEXB0004，视频纹理支持）
-- `.mpkg` 扩展名在 `info`/`extract`/`pack` 中的完整支持
-- 自动魔术字识别（`.mpkg`→PKGM0019，`.pkg`→PKGV0005）
-- net8.0 目标框架支持
-
-修复：
-- `WriteStringI32Size` UTF-8 字节数计算
-- `TexToImageConverter` 图片裁剪/缩放逻辑
-- 非 MP4 V4 容器回退 V3 mipmap 格式
+| 改动 | 关联 Issue | 说明 |
+|------|-----------|------|
+| `pack` 命令（目录→PKG/MPKG，文件→TEX） | [#72](https://github.com/notscuffed/repkg/issues/72) | 社区最迫切的需求 |
+| `ImageToTexConverter`（图片/GIF/视频→TEX） | [#72](https://github.com/notscuffed/repkg/issues/72) | 打包功能的核心实现 |
+| V4 纹理容器写入器 + 视频 TEX | — | 视频壁纸打包支持 |
+| `.mpkg` 扩展名完整支持 | [#34](https://github.com/notscuffed/repkg/issues/34) | Android 手机壁纸引擎 |
+| 自动魔术字识别 | — | `.mpkg`→PKGM0019 |
+| net8.0/net9.0 多框架 | [#58](https://github.com/notscuffed/repkg/issues/58), [#29](https://github.com/notscuffed/repkg/issues/29) | Linux/macOS/ARM64 跨平台 |
+| `TexToImageConverter` 裁剪/缩放修复 | [#18](https://github.com/notscuffed/repkg/issues/18) | 修复 Crop 越界崩溃 |
+| `WriteStringI32Size` UTF-8 长度修复 | [#65](https://github.com/notscuffed/repkg/issues/65), [#63](https://github.com/notscuffed/repkg/issues/63) | 修复 "Size cannot be negative" |
+| 非 MP4 V4 回退 V3 mipmap | — | 与官方 TEX 格式对齐 |
 
 ## 许可证
 
