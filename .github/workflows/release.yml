@@ -102,6 +102,7 @@ jobs:
         run: |
           dotnet pack RePKG/RePKG.csproj \
             -c Release \
+            -p:TargetFramework=net8.0 \
             -o ./nupkg
 
       - uses: actions/upload-artifact@v4
