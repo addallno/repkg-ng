@@ -3,7 +3,7 @@
         <RootNamespace>RePKG</RootNamespace>
         <OutputType>Exe</OutputType>
         <TargetFrameworks>net472;net8.0</TargetFrameworks>
-        <Version>0.5.0</Version>
+        <Version>0.5.1</Version>
         <Copyright>Copyright © NotScuffed 2025</Copyright>
         <PackAsTool Condition="'$(TargetFramework)' != 'net472'">true</PackAsTool>
         <ToolCommandName>repkg</ToolCommandName>
