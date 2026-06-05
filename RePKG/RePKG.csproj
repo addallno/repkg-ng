@@ -3,7 +3,7 @@
         <RootNamespace>RePKG</RootNamespace>
         <OutputType>Exe</OutputType>
         <TargetFrameworks>net472;net8.0</TargetFrameworks>
-        <Version>0.4.0</Version>
+        <Version>4.1.0</Version>
         <Copyright>Copyright © NotScuffed 2025</Copyright>
     </PropertyGroup>
     
