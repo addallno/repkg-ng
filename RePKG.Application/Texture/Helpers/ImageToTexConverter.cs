@@ -95,18 +95,18 @@ namespace RePKG.Application.Texture.Helpers
                 {
                     Format = TexFormat.RGBA8888,
                     Flags = TexFlags.IsGif,
-                    TextureWidth = texWidth,
-                    TextureHeight = texHeight,
-                    ImageWidth = gif.Width,
-                    ImageHeight = gif.Height,
-                    UnkInt0 = 0
-                };
+                TextureWidth = texWidth,
+                TextureHeight = texHeight,
+                ImageWidth = gif.Width,
+                ImageHeight = gif.Height,
+                UnkInt0 = 0
+            };
 
-                var imageContainer = new TexImageContainer
-                {
-                    Magic = "TEXB0003",
-                    ImageContainerVersion = TexImageContainerVersion.Version3,
-                    ImageFormat = FreeImageFormat.FIF_GIF
+            var imageContainer = new TexImageContainer
+            {
+                Magic = "TEXB0003",
+                ImageContainerVersion = TexImageContainerVersion.Version3,
+                ImageFormat = FreeImageFormat.FIF_GIF
                 };
 
                 var frameInfos = new TexFrameInfoContainer
@@ -226,13 +226,10 @@ namespace RePKG.Application.Texture.Helpers
             if (width <= 0) width = 1920;
             if (height <= 0) height = 1080;
 
-            var texWidth = NextPowerOfTwo(width);
-            var texHeight = NextPowerOfTwo(height);
-
             var mipmap = new TexMipmap
             {
-                Width = texWidth,
-                Height = texHeight,
+                Width = width,
+                Height = height,
                 Bytes = videoBytes,
                 Format = MipmapFormat.VideoMp4,
                 IsLZ4Compressed = false,
@@ -253,9 +250,9 @@ namespace RePKG.Application.Texture.Helpers
             var header = new TexHeader
             {
                 Format = TexFormat.RGBA8888,
-                Flags = TexFlags.IsVideoTexture,
-                TextureWidth = texWidth,
-                TextureHeight = texHeight,
+                Flags = TexFlags.IsVideoTexture | TexFlags.ClampUVs,
+                TextureWidth = width,
+                TextureHeight = height,
                 ImageWidth = width,
                 ImageHeight = height,
                 UnkInt0 = 0
