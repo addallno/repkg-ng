@@ -61,33 +61,55 @@ jobs:
           name: self-contained-${{ matrix.rid }}
           path: repkg-${{ matrix.rid }}.*
 
-  # ── Framework-dependent portable build (~1.5MB) ──
+  # ── Framework-dependent portable builds (~1.5MB, needs .NET runtime) ──
   portable:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            ext: .exe
+            archive: zip
+          - rid: linux-x64
+            os: ubuntu-latest
+            ext: ''
+            archive: tar.gz
+          - rid: linux-arm64
+            os: ubuntu-latest
+            ext: ''
+            archive: tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Publish (framework-dependent, any cpu)
+      - name: Publish ${{ matrix.rid }} (framework-dependent)
         run: |
           dotnet publish RePKG/RePKG.csproj \
-            -c Release -f net8.0 \
+            -c Release -f net8.0 -r ${{ matrix.rid }} \
             -o ./publish
-          rm -f ./publish/*.pdb ./publish/*.config ./publish/*.xml
 
-      - name: Package portable zip
+      - name: Package archive
         run: |
           cd publish
-          mv RePKG repkg
+          rm -f *.pdb *.config *.xml
+          mv RePKG${{ matrix.ext }} repkg-${{ matrix.rid }}${{ matrix.ext }}
           cd ..
-          tar czf repkg-portable.tar.gz -C publish .
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a repkg-portable-${{ matrix.rid }}.zip ./publish/*
+          else
+            tar czf repkg-portable-${{ matrix.rid }}.tar.gz -C publish .
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: portable
-          path: repkg-portable.tar.gz
+          name: portable-${{ matrix.rid }}
+          path: repkg-portable-${{ matrix.rid }}.*
 
   # ── NuGet package ──
   nuget:
@@ -138,7 +160,7 @@ jobs:
             repkg-win-x64.*
             repkg-linux-x64.*
             repkg-linux-arm64.*
-            repkg-portable.*
+            repkg-portable-*
           fail_on_unmatched_files: false
 
       - name: Push NuGet to GitHub Packages
