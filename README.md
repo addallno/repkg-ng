@@ -6,6 +6,33 @@
 > 我们向上游提交了 PR [#73](https://github.com/notscuffed/repkg/pull/73) 包含了以下所有改动，
 > 但上游长期不活跃，因此在此 fork 中维护。
 
+[![Build](https://github.com/addallno/repkg/actions/workflows/release.yml/badge.svg)](https://github.com/addallno/repkg/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/addallno/repkg?include_prereleases)](https://github.com/addallno/repkg/releases)
+[![NuGet](https://img.shields.io/badge/nuget-v0.5.0--alpha-blue)](https://github.com/users/addallno/packages/nuget/package/RePKG)
+
+## 快速安装
+
+```sh
+# 方式一：自包含二进制（免运行时，推荐）
+# 从 https://github.com/addallno/repkg/releases 下载对应平台的 .zip/.tar.gz，解压即可
+
+# 方式二：dotnet global tool（需要 .NET SDK 8.0+）
+dotnet tool install --global RePKG \
+  --add-source https://nuget.pkg.github.com/addallno/index.json
+
+# 之后直接运行
+repkg info ./wallpaper.pkg
+```
+
+> **关于跨架构运行**：`repkg` 命令行工具是平台相关的原生二进制，必须在对应的 CPU 架构上运行。
+> 但 `RePKG.dll` 是 .NET IL 代码，**完全跨架构**——只要目标设备安装了 .NET 运行时，
+> 就可以通过 `dotnet RePKG.dll <command>` 在任何架构上运行，无需重新编译。
+> 例如在 Android Termux 上：
+> ```sh
+> cd repkg-portable  # 包含所有 .dll 文件
+> dotnet RePKG.dll info wallpaper.mpkg
+> ```
+
 ## 功能
 
 ### 支持的操作
@@ -87,6 +114,24 @@ dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r win-x64 --self-contain
 当使用 V4 容器（TEXB0004）但内容不是 MP4 视频时，回退使用 V3 mipmap 数据结构，
 使转换后的 TEX 格式与官方 Wallpaper Engine 输出一致。
 
+## 使用示例
+
+```sh
+# 查看包信息
+repkg info wallpaper.pkg
+repkg info wallpaper.mpkg --printentries
+
+# 解包
+repkg extract wallpaper.pkg -o ./output
+repkg extract wallpaper.mpkg -o ./output --no-tex-convert
+
+# 打包
+repkg pack ./output -o wallpaper.mpkg    # Android .mpkg
+repkg pack ./output -o wallpaper.pkg     # 桌面 .pkg
+repkg pack video.mp4                      # MP4 → video.tex
+repkg pack image.png -f R8                # PNG → R8纹理
+```
+
 ## 编译
 
 ### 依赖
@@ -113,24 +158,6 @@ dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r linux-arm64 --self-con
 
 # macOS Apple Silicon
 dotnet publish RePKG/RePKG.csproj -c Release -f net8.0 -r osx-arm64 --self-contained -o ./publish
-```
-
-## 使用示例
-
-```sh
-# 查看包信息
-dotnet RePKG.dll info wallpaper.pkg
-dotnet RePKG.dll info wallpaper.mpkg --printentries
-
-# 解包
-dotnet RePKG.dll extract wallpaper.pkg -o ./output
-dotnet RePKG.dll extract wallpaper.mpkg -o ./output --no-tex-convert
-
-# 打包
-dotnet RePKG.dll pack ./output -o wallpaper.mpkg    # Android .mpkg
-dotnet RePKG.dll pack ./output -o wallpaper.pkg     # 桌面 .pkg
-dotnet RePKG.dll pack video.mp4                      # MP4 → video.tex
-dotnet RePKG.dll pack image.png -f R8                # PNG → R8纹理
 ```
 
 ## 与上游的差异 / Issues 对应
