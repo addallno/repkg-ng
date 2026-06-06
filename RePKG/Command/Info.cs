@@ -195,7 +195,7 @@ namespace RePKG.Command
 
             var workshopId = projectJson.Value<string>("workshopid");
             if (!string.IsNullOrEmpty(workshopId))
-                Console.WriteLine($"  Workshop ID:    {workshopId}  (Wengine appid: 431960)");
+                Console.WriteLine($"  Workshop ID:    {workshopId}  (WallpaperEngine appid: 431960)");
 
             var type = projectJson.Value<string>("type");
             if (!string.IsNullOrEmpty(type))
