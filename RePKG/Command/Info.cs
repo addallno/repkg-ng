@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using CommandLine;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RePKG.Application.Package;
 using RePKG.Application.Texture;
 using RePKG.Core.Package;
@@ -96,11 +98,6 @@ namespace RePKG.Command
 
         private static void InfoPkg(FileInfo file, string name)
         {
-            var projectInfo = GetProjectInfo(file);
-
-            if (!MatchesFilter(projectInfo))
-                return;
-
             Package package;
             using (var reader = new BinaryReader(file.Open(FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
@@ -113,33 +110,12 @@ namespace RePKG.Command
             var binCount = entries.Count - texCount;
 
             Console.WriteLine($"\r\n### Package: {name}");
+            PrintProjectJsonFields(file, package);
             Console.WriteLine($"  Magic:          {package.Magic}");
             Console.WriteLine($"  File size:      {FormatSize(file.Length)}");
             Console.WriteLine($"  Entries:        {entries.Count} ({texCount} tex, {binCount} other)");
             Console.WriteLine($"  Header size:    {package.HeaderSize} bytes");
             Console.WriteLine($"  Data size:      {FormatSize(totalDataSize)}");
-
-            if (projectInfo != null && _projectInfoToPrint?.Length > 0)
-            {
-                IEnumerable<string> projectInfoEnumerator;
-
-                if (_projectInfoToPrint.Length == 1 && _projectInfoToPrint[0] == "*")
-                    projectInfoEnumerator = Helper.GetPropertyKeysForDynamic(projectInfo);
-                else
-                {
-                    projectInfoEnumerator = Helper.GetPropertyKeysForDynamic(projectInfo);
-                    projectInfoEnumerator = projectInfoEnumerator.Where(x =>
-                        _projectInfoToPrint.Contains(x, StringComparer.OrdinalIgnoreCase));
-                }
-
-                foreach (var key in projectInfoEnumerator)
-                {
-                    if (projectInfo[key] == null)
-                        Console.WriteLine($"  {key}: null");
-                    else
-                        Console.WriteLine($"  {key}: {projectInfo[key]}");
-                }
-            }
 
             if (_options.PrintEntries)
             {
@@ -162,6 +138,127 @@ namespace RePKG.Command
                 {
                     var label = entry.Type == EntryType.Tex ? "TEX" : "BIN";
                     Console.WriteLine($"  * {entry.FullPath,-55} {label,5} {entry.Length,10} bytes  [0x{entry.Offset:X8}]");
+                }
+            }
+        }
+
+        private static void PrintProjectJsonFields(FileInfo file, Package package)
+        {
+            JObject projectJson = null;
+
+            var projectEntry = package.Entries.FirstOrDefault(e =>
+                e.FullPath.Equals("project.json", StringComparison.OrdinalIgnoreCase));
+
+            if (projectEntry != null)
+            {
+                using (var reader = new BinaryReader(file.Open(FileMode.Open, FileAccess.Read, FileShare.Read)))
+                {
+                    reader.BaseStream.Seek(projectEntry.Offset + package.HeaderSize, SeekOrigin.Begin);
+                    var bytes = reader.ReadBytes(projectEntry.Length);
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        try
+                        {
+                            projectJson = JObject.Parse(Encoding.UTF8.GetString(bytes));
+                        }
+                        catch { }
+                    }
+                }
+            }
+
+            if (projectJson == null)
+            {
+                var directory = file.Directory;
+                if (directory != null)
+                {
+                    var projectFiles = directory.GetFiles("project.json");
+                    if (projectFiles.Length > 0 && projectFiles[0].Exists)
+                    {
+                        try
+                        {
+                            projectJson = JObject.Parse(File.ReadAllText(projectFiles[0].FullName));
+                        }
+                        catch { }
+                    }
+                }
+            }
+
+            if (projectJson == null)
+                return;
+
+            if (!MatchesFilter(projectJson))
+                return;
+
+            var title = projectJson.Value<string>("title");
+            if (!string.IsNullOrEmpty(title))
+                Console.WriteLine($"  Title:          {title}");
+
+            var workshopId = projectJson.Value<string>("workshopid");
+            if (!string.IsNullOrEmpty(workshopId))
+                Console.WriteLine($"  Workshop ID:    {workshopId}  (Wengine appid: 431960)");
+
+            var type = projectJson.Value<string>("type");
+            if (!string.IsNullOrEmpty(type))
+                Console.WriteLine($"  Type:           {type}");
+
+            var schema = projectJson.Value<string>("schema");
+            if (!string.IsNullOrEmpty(schema))
+                Console.WriteLine($"  Schema:         {schema}");
+
+            var tags = projectJson["tags"];
+            if (tags is JArray tagArray && tagArray.Count > 0)
+            {
+                var tagStr = string.Join(", ", tagArray.Select(t => t.ToString()));
+                Console.WriteLine($"  Tags:           {tagStr}");
+            }
+
+            var description = projectJson.Value<string>("description");
+            if (!string.IsNullOrEmpty(description))
+            {
+                var desc = description.Length > 120 ? description.Substring(0, 120) + "..." : description;
+                Console.WriteLine($"  Description:    {desc}");
+            }
+
+            var visible = projectJson.Value<string>("visible");
+            if (!string.IsNullOrEmpty(visible))
+                Console.WriteLine($"  Visible:        {visible}");
+
+            var fileStr = projectJson.Value<string>("file");
+            if (!string.IsNullOrEmpty(fileStr))
+                Console.WriteLine($"  Main file:      {fileStr}");
+
+            var preview = projectJson.Value<string>("preview");
+            if (!string.IsNullOrEmpty(preview))
+                Console.WriteLine($"  Preview:        {preview}");
+
+            var contentrating = projectJson.Value<string>("contentrating");
+            if (!string.IsNullOrEmpty(contentrating))
+                Console.WriteLine($"  Content rating: {contentrating}");
+
+            if (_projectInfoToPrint?.Length > 0)
+            {
+                var allKeys = projectJson.Properties().Select(p => p.Name).ToList();
+                IEnumerable<string> keysToPrint;
+                if (_projectInfoToPrint.Length == 1 && _projectInfoToPrint[0] == "*")
+                    keysToPrint = allKeys;
+                else
+                    keysToPrint = allKeys.Where(k =>
+                        _projectInfoToPrint.Contains(k, StringComparer.OrdinalIgnoreCase));
+
+                var printedKeys = new HashSet<string> {
+                    "title", "workshopid", "type", "schema", "tags",
+                    "description", "visible", "file", "preview", "contentrating"
+                };
+
+                foreach (var key in keysToPrint)
+                {
+                    if (printedKeys.Contains(key.ToLower()))
+                        continue;
+                    var val = projectJson[key];
+                    if (val == null || val.Type == JTokenType.Null)
+                        Console.WriteLine($"  {key}: null");
+                    else
+                        Console.WriteLine($"  {key}: {val}");
                 }
             }
         }
@@ -284,28 +381,15 @@ namespace RePKG.Command
             return $"{bytes / (double)GB:F2} GB ({bytes} bytes)";
         }
 
-        private static dynamic GetProjectInfo(FileInfo packageFile)
+        private static bool MatchesFilter(JObject projectJson)
         {
-            var directory = packageFile.Directory;
-            if (directory == null)
-                return null;
-
-            var projectJson = directory.GetFiles("project.json");
-            if (projectJson.Length == 0 || !projectJson[0].Exists)
-                return null;
-
-            return JsonConvert.DeserializeObject(File.ReadAllText(projectJson[0].FullName));
-        }
-
-        private static bool MatchesFilter(dynamic project)
-        {
-            if (project == null)
+            if (projectJson == null)
                 return true;
 
             if (!string.IsNullOrEmpty(_options.TitleFilter))
             {
-                var title = (string) project.title;
-                if (!title.Contains(_options.TitleFilter, StringComparison.OrdinalIgnoreCase))
+                var title = projectJson.Value<string>("title");
+                if (!string.IsNullOrEmpty(title) && !title.Contains(_options.TitleFilter, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
 
