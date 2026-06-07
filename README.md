@@ -73,21 +73,21 @@ repkg pack input.png -f R8 -o output.tex         # 指定格式
 
 ```sh
 # 替换单个文件
-repkg replace input.mpkg -o output.mpkg -r scene.json=./new_scene.json
+repkg replace input.mpkg -o output.mpkg -r scene.json -f ./new_scene.json
 
-# 批量替换多个文件
+# 批量替换多个文件（-r 和 -f 按顺序配对）
 repkg replace input.mpkg -o output.mpkg \
-  -r scene.json=./new_scene.json \
-  -r textures/some.tex=./replacement.tex
+  -r scene.json -f ./new_scene.json \
+  -r textures/some.tex -f ./replacement.tex
 
 # 使用旧名输出（自动添加 .replaced 后缀）
-repkg replace input.mpkg -r scene.json=./new_scene.json
+repkg replace input.mpkg -r scene.json -f ./new_scene.json
 # → input.replaced.mpkg
 ```
 
-> **注意**：`-r` 参数的 `path` 必须与包内条目的完整路径**完全一致**（包括子目录前缀），
-> 可通过 `info` 命令查看所有条目路径。例如条目路径为 `textures/clock.tex`，
-> 则 `-r textures/clock.tex=/path/to/new.tex`。路径分隔符统一使用 `/`。
+> **注意**：`-r` 指定包内路径，`-f` 指定本地文件，两者按顺序配对。
+> `-r` 的路径必须与包内条目的完整路径**完全一致**（包括子目录前缀），
+> 可通过 `info` 命令查看所有条目路径。路径分隔符统一使用 `/`。
 
 ### extract / info 命令改进
 - 现在支持 `.mpkg` 后缀（原版只认 `.pkg`）— 回应 [#34](https://github.com/notscuffed/repkg/issues/34)

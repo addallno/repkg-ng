@@ -34,24 +34,13 @@ namespace RePKG.Command
                     $"{name}.replaced{ext}");
             }
 
-            // Parse replacements
-            var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var r in options.Replacements)
-            {
-                var idx = r.IndexOf('=');
-                if (idx <= 0 || idx >= r.Length - 1)
-                {
-                    Console.WriteLine($"Invalid --replace format: {r} (expected path=filepath)");
-                    return;
-                }
-                var pkgPath = r.Substring(0, idx).Trim();
-                var filePath = r.Substring(idx + 1).Trim();
-                replacements[pkgPath] = filePath;
-            }
+            var pkgPaths = options.Replacements?.ToList() ?? new List<string>();
+            var filePaths = options.Files?.ToList() ?? new List<string>();
 
-            if (replacements.Count == 0)
+            if (pkgPaths.Count == 0 || pkgPaths.Count != filePaths.Count)
             {
-                Console.WriteLine("No replacements specified. Use --replace path=filepath");
+                Console.WriteLine($"Mismatch: {pkgPaths.Count} inside paths (-r) but {filePaths.Count} files (-f)");
+                Console.WriteLine("Usage: repkg replace <pkg> -r <inside path> -f <file> [-o <output>]");
                 return;
             }
 
@@ -67,10 +56,10 @@ namespace RePKG.Command
             Console.WriteLine($"Entries: {package.Entries.Count}, Magic: {package.Magic}");
 
             // Apply replacements
-            foreach (var kvp in replacements)
+            for (int i = 0; i < pkgPaths.Count; i++)
             {
-                var pkgPath = kvp.Key.Replace('\\', '/');
-                var filePath = kvp.Value;
+                var pkgPath = pkgPaths[i].Replace('\\', '/');
+                var filePath = filePaths[i];
 
                 // Find matching entry
                 var entry = package.Entries.FirstOrDefault(e =>
@@ -79,7 +68,7 @@ namespace RePKG.Command
 
                 if (entry == null)
                 {
-                    Console.WriteLine($"Entry not found in package: {kvp.Key}");
+                    Console.WriteLine($"Entry not found in package: {pkgPaths[i]}");
                     Console.WriteLine("Available entries:");
                     foreach (var e in package.Entries)
                         Console.WriteLine($"  {e.FullPath}");
@@ -119,8 +108,11 @@ namespace RePKG.Command
         [Option('o', "output", Required = false, HelpText = "Output PKG/MPKG path (default: input.replaced.pkg)")]
         public string Output { get; set; }
 
-        [Option('r', "replace", Required = true, HelpText = "Replace mapping: path=filepath (can be specified multiple times)", Min = 1)]
+        [Option('r', "replace", Required = true, HelpText = "Path inside the package (can be specified multiple times)", Min = 1)]
         public IEnumerable<string> Replacements { get; set; }
+
+        [Option('f', "file", Required = true, HelpText = "Local file to replace with (paired with -r by index)", Min = 1)]
+        public IEnumerable<string> Files { get; set; }
 
         [Value(0, Required = true, HelpText = "Input PKG/MPKG path", MetaName = "Input")]
         public string Input { get; set; }
