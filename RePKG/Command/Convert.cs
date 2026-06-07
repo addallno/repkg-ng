@@ -15,7 +15,7 @@ namespace RePKG.Command
 
         static Convert()
         {
-            _packageReader = new PackageReader { ReadEntryBytes = false };
+            _packageReader = new PackageReader { ReadEntryBytes = true };
             _packageWriter = new PackageWriter();
         }
 

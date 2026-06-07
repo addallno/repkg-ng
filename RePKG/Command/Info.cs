@@ -51,7 +51,8 @@ namespace RePKG.Command
                     else
                         InfoPkgDirectory(directoryInfo);
 
-                    Console.WriteLine("Done");
+                    if (string.IsNullOrEmpty(_options.OnlyFields))
+                        Console.WriteLine("Done");
                     return;
                 }
 
@@ -61,7 +62,8 @@ namespace RePKG.Command
             }
 
             InfoFile(fileInfo);
-            Console.WriteLine("Done");
+            if (string.IsNullOrEmpty(_options.OnlyFields))
+                Console.WriteLine("Done");
         }
 
         private static string T(string zh, string en) => Program.EnglishMode ? en : zh;
@@ -112,17 +114,15 @@ namespace RePKG.Command
             var texCount = entries.Count(e => e.Type == EntryType.Tex);
             var binCount = entries.Count - texCount;
 
-            // Extract project.json for field filtering
-            var projectJson = ReadProjectJson(file, package);
-
+            // --only: print only specified fields, skip all formatting
             if (!string.IsNullOrEmpty(_options.OnlyFields))
             {
-                PrintOnlyFields(_options.OnlyFields, package, projectJson, file.Length, texCount, binCount);
+                PrintOnlyFields(_options.OnlyFields, package, file);
                 return;
             }
 
             Console.WriteLine($"\r\n### Package: {name}");
-            PrintProjectJsonFields(file, package, projectJson);
+            PrintProjectJsonFields(file, package);
             Console.WriteLine($"  Magic:          {package.Magic}");
             Console.WriteLine(T($"  文件大小:       ", "  File size:      ") + FormatSize(file.Length));
             Console.WriteLine(T($"  条目数:         ", "  Entries:        ") + $"{entries.Count} ({texCount} tex, {binCount} other)");
@@ -168,8 +168,10 @@ namespace RePKG.Command
             }
         }
 
-        private static JObject ReadProjectJson(FileInfo file, Package package)
+        private static void PrintProjectJsonFields(FileInfo file, Package package)
         {
+            JObject projectJson = null;
+
             var projectEntry = package.Entries.FirstOrDefault(e =>
                 e.FullPath.Equals("project.json", StringComparison.OrdinalIgnoreCase));
 
@@ -181,28 +183,31 @@ namespace RePKG.Command
                     var bytes = reader.ReadBytes(projectEntry.Length);
                     if (bytes != null && bytes.Length > 0)
                     {
-                        try { return JObject.Parse(Encoding.UTF8.GetString(bytes)); } catch { }
+                        try
+                        {
+                            projectJson = JObject.Parse(Encoding.UTF8.GetString(bytes));
+                        }
+                        catch { }
                     }
                 }
             }
 
-            var directory = file.Directory;
-            if (directory != null)
+            if (projectJson == null)
             {
-                var projectFiles = directory.GetFiles("project.json");
-                if (projectFiles.Length > 0 && projectFiles[0].Exists)
+                var directory = file.Directory;
+                if (directory != null)
                 {
-                    try { return JObject.Parse(File.ReadAllText(projectFiles[0].FullName)); } catch { }
+                    var projectFiles = directory.GetFiles("project.json");
+                    if (projectFiles.Length > 0 && projectFiles[0].Exists)
+                    {
+                        try
+                        {
+                            projectJson = JObject.Parse(File.ReadAllText(projectFiles[0].FullName));
+                        }
+                        catch { }
+                    }
                 }
             }
-
-            return null;
-        }
-
-        private static void PrintProjectJsonFields(FileInfo file, Package package, JObject projectJson = null)
-        {
-            if (projectJson == null)
-                projectJson = ReadProjectJson(file, package);
 
             if (projectJson == null)
                 return;
@@ -304,8 +309,32 @@ namespace RePKG.Command
             }
         }
 
-        private static void PrintOnlyFields(string onlyStr, Package package, JObject projectJson, long fileSize, int texCount, int binCount)
+        private static void PrintOnlyFields(string onlyStr, Package package, FileInfo file)
         {
+            JObject projectJson = null;
+            var projectEntry = package.Entries.FirstOrDefault(e =>
+                e.FullPath.Equals("project.json", StringComparison.OrdinalIgnoreCase));
+            if (projectEntry != null)
+            {
+                using (var reader = new BinaryReader(file.Open(FileMode.Open, FileAccess.Read, FileShare.Read)))
+                {
+                    reader.BaseStream.Seek(projectEntry.Offset + package.HeaderSize, SeekOrigin.Begin);
+                    var bytes = reader.ReadBytes(projectEntry.Length);
+                    if (bytes != null && bytes.Length > 0)
+                        try { projectJson = JObject.Parse(Encoding.UTF8.GetString(bytes)); } catch { }
+                }
+            }
+            if (projectJson == null)
+            {
+                var dir = file.Directory;
+                if (dir != null)
+                {
+                    var pjs = dir.GetFiles("project.json");
+                    if (pjs.Length > 0 && pjs[0].Exists)
+                        try { projectJson = JObject.Parse(File.ReadAllText(pjs[0].FullName)); } catch { }
+                }
+            }
+
             var fields = onlyStr.Split(',')
                 .Select(f => f.Trim().ToLowerInvariant())
                 .ToList();
@@ -318,8 +347,12 @@ namespace RePKG.Command
                         Console.WriteLine(projectJson?.Value<string>("title") ?? "");
                         break;
                     case "author":
-                        Console.WriteLine(ExtractAuthorFromProject(projectJson));
+                    {
+                        var a = projectJson?.Value<string>("author");
+                        if (string.IsNullOrEmpty(a)) a = projectJson?.Value<string>("workshopid") ?? "";
+                        Console.WriteLine(a);
                         break;
+                    }
                     case "count":
                         Console.WriteLine(package.Entries.Count);
                         break;
@@ -330,32 +363,18 @@ namespace RePKG.Command
                         Console.WriteLine(projectJson?.Value<string>("type") ?? "");
                         break;
                     case "tags":
+                    {
                         var tags = projectJson?["tags"];
-                        if (tags is JArray tagArray && tagArray.Count > 0)
-                            Console.WriteLine(string.Join(", ", tagArray.Select(t => t.ToString())));
+                        if (tags is JArray ta && ta.Count > 0)
+                            Console.WriteLine(string.Join(", ", ta.Select(t => t.ToString())));
                         break;
+                    }
                     case "entries":
-                        foreach (var entry in package.Entries)
-                            Console.WriteLine(entry.FullPath);
+                        foreach (var e in package.Entries)
+                            Console.WriteLine(e.FullPath);
                         break;
                 }
             }
-        }
-
-        private static string ExtractAuthorFromProject(JObject projectJson)
-        {
-            if (projectJson == null) return "";
-            var author = projectJson.Value<string>("author");
-            if (!string.IsNullOrEmpty(author)) return author;
-            var workshopId = projectJson.Value<string>("workshopid");
-            var desc = projectJson.Value<string>("description");
-            if (!string.IsNullOrEmpty(desc))
-            {
-                var firstLine = desc.Split('\n')[0].Trim();
-                if (firstLine.Length > 0 && firstLine.Length < 80)
-                    return firstLine;
-            }
-            return workshopId ?? "";
         }
 
         private static void InfoTex(FileInfo file)
