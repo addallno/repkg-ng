@@ -132,6 +132,11 @@ repkg pack video.mp4                      # MP4 → video.tex
 repkg pack image.png -f R8                # PNG → R8纹理
 ```
 
+> **重要提示**：解包后修改文件再重打包时，`project.json` 必须保留在输出目录中，
+> 否则打包出的 `.mpkg`/`.pkg` 在 Wallpaper Engine 中无法正确识别为可用项目。
+> `project.json` 包含标题、描述、预览图、内容分级等元数据，是壁纸的必要标识文件。
+> 提取时使用 `--copyproject` 参数可自动从原 PKG 所在目录复制此文件。
+
 ## 编译
 
 ### 依赖
