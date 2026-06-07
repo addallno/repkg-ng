@@ -92,15 +92,16 @@ namespace RePKG.Command
 
                 if (entry.Type == EntryType.Tex && ShouldConvert(filePath, options.ForceConvert))
                 {
+                    var useLz4 = !options.NoLz4;
                     if (options.ForceConvert && Path.GetExtension(filePath) == ".tex")
                     {
                         Console.WriteLine($"Re-encoding: {filePath} -> TEX");
-                        newBytes = ReencodeTexFile(filePath);
+                        newBytes = ReencodeTexFile(filePath, useLz4);
                     }
                     else
                     {
                         Console.WriteLine($"Converting: {filePath} -> TEX");
-                        newBytes = ConvertToTexBytes(filePath, options.VideoWidth, options.VideoHeight);
+                        newBytes = ConvertToTexBytes(filePath, options.VideoWidth, options.VideoHeight, useLz4);
                     }
                 }
                 else
@@ -140,7 +141,7 @@ namespace RePKG.Command
             return ImageExts.Contains(ext);
         }
 
-        private static byte[] ReencodeTexFile(string filePath)
+        private static byte[] ReencodeTexFile(string filePath, bool useLz4)
         {
             // Read existing TEX
             ITex tex;
@@ -154,7 +155,7 @@ namespace RePKG.Command
                 // Video TEX: extract MP4 bytes, re-wrap in video TEX
                 var mp4Bytes = tex.FirstImage.FirstMipmap.Bytes;
                 var width = tex.Header.TextureWidth;
-                var height = tex.Header.TextureHeight;
+                var height = tex.Header.ImageHeight;
                 return BuildVideoTexBytes(mp4Bytes, width, height);
             }
 
@@ -166,7 +167,7 @@ namespace RePKG.Command
                 using (var ms = new MemoryStream(result.Bytes))
                 using (var image = SixLabors.ImageSharp.Image.Load<Rgba32>(ms))
                 {
-                    var newTex = ImageToTexConverter.Convert(image, TexFormat.RGBA8888, false);
+                    var newTex = ImageToTexConverter.Convert(image, TexFormat.RGBA8888, useLz4);
                     using (var outMs = new MemoryStream())
                     using (var writer = new BinaryWriter(outMs))
                     {
@@ -183,7 +184,7 @@ namespace RePKG.Command
                 try
                 {
                     File.WriteAllBytes(tmp, result.Bytes);
-                    var newTex = ImageToTexConverter.ConvertFromGif(tmp, false);
+                    var newTex = ImageToTexConverter.ConvertFromGif(tmp, useLz4);
                     using (var outMs = new MemoryStream())
                     using (var writer = new BinaryWriter(outMs))
                     {
@@ -259,7 +260,7 @@ namespace RePKG.Command
             return ImageExts.Contains(ext);
         }
 
-        private static byte[] ConvertToTexBytes(string filePath, int videoWidth, int videoHeight)
+        private static byte[] ConvertToTexBytes(string filePath, int videoWidth, int videoHeight, bool useLz4 = true)
         {
             var isVideo = ImageToTexConverter.IsVideoFile(filePath);
             var ext = Path.GetExtension(filePath);
@@ -272,11 +273,11 @@ namespace RePKG.Command
             }
             else if (isGif)
             {
-                tex = ImageToTexConverter.ConvertFromGif(filePath, false);
+                tex = ImageToTexConverter.ConvertFromGif(filePath, useLz4);
             }
             else
             {
-                tex = ImageToTexConverter.Convert(filePath, TexFormat.RGBA8888, false);
+                tex = ImageToTexConverter.Convert(filePath, TexFormat.RGBA8888, useLz4);
             }
 
             using (var ms = new MemoryStream())
@@ -302,6 +303,9 @@ namespace RePKG.Command
 
         [Option('F', "force-convert", Required = false, HelpText = "Force re-encode even when replacing .tex with .tex")]
         public bool ForceConvert { get; set; }
+
+        [Option("no-lz4", Required = false, HelpText = "Disable LZ4 mipmap compression (enabled by default)")]
+        public bool NoLz4 { get; set; }
 
         [Option("video-width", Required = false, HelpText = "Video width in pixels (auto-detected if omitted)")]
         public int VideoWidth { get; set; }
