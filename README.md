@@ -41,6 +41,7 @@ repkg info ./wallpaper.pkg
 | `extract` | 解包 `.pkg`/`.mpkg` → 文件目录；转换 `.tex` → 图片 |
 | `info` | 查看 `.pkg`/`.mpkg`/`.tex` 文件信息 |
 | `pack` | 目录 → `.pkg`/`.mpkg`；图片/视频 → `.tex` |
+| `replace` | 替换 `.pkg`/`.mpkg` 内部文件，无需完整解包/打包 |
 
 ### pack 命令（新增）
 回应 [#72](https://github.com/notscuffed/repkg/issues/72) — 打包功能请求。
@@ -67,6 +68,26 @@ repkg pack input.png -f R8 -o output.tex         # 指定格式
 - 输出后缀 `.mpkg` → 魔术字 `PKGM0019`（Android 壁纸引擎 "ID版"）
 - 输出后缀 `.pkg` → 魔术字 `PKGV0005`（桌面版 Wallpaper Engine）
 - 可通过 `-m` 参数覆盖
+
+### replace 命令（新增）
+
+```sh
+# 替换单个文件
+repkg replace input.mpkg -o output.mpkg -r scene.json=./new_scene.json
+
+# 批量替换多个文件
+repkg replace input.mpkg -o output.mpkg \
+  -r scene.json=./new_scene.json \
+  -r textures/some.tex=./replacement.tex
+
+# 使用旧名输出（自动添加 .replaced 后缀）
+repkg replace input.mpkg -r scene.json=./new_scene.json
+# → input.replaced.mpkg
+```
+
+> **注意**：`-r` 参数的 `pkgpath` 必须与包内条目的完整路径**完全一致**（包括子目录前缀），
+> 可通过 `info` 命令查看所有条目路径。例如条目路径为 `textures/clock.tex`，
+> 则 `-r textures/clock.tex=/path/to/new.tex`。路径分隔符统一使用 `/`。
 
 ### extract / info 命令改进
 - 现在支持 `.mpkg` 后缀（原版只认 `.pkg`）— 回应 [#34](https://github.com/notscuffed/repkg/issues/34)
