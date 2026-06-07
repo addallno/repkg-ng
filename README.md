@@ -85,6 +85,10 @@ repkg replace input.mpkg -r scene.json -f ./new_scene.json
 # → input.replaced.mpkg
 ```
 
+> **自动 TEX 转换**：如果替换目标是 `.tex` 条目且本地文件是视频（MP4/WebM/AVI/MOV/MKV/FLV/WMV）
+> 或图片（PNG/JPEG/BMP/WebP/TGA/TIFF/GIF），会自动转换为有效的 TEX 格式。
+> 视频尺寸通过 ffprobe 自动检测，也可用 `--video-width` / `--video-height` 覆盖。
+>
 > **注意**：`-r` 指定包内路径，`-f` 指定本地文件，两者按顺序配对。
 > `-r` 的路径必须与包内条目的完整路径**完全一致**（包括子目录前缀），
 > 可通过 `info` 命令查看所有条目路径。路径分隔符统一使用 `/`。

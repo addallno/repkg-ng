@@ -4,8 +4,14 @@ using System.IO;
 using System.Linq;
 using CommandLine;
 using RePKG.Application.Package;
+using RePKG.Application.Texture;
+using RePKG.Application.Texture.Helpers;
 using RePKG.Core.Package;
+using RePKG.Core.Package.Enums;
 using RePKG.Core.Package.Interfaces;
+using RePKG.Core.Texture;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace RePKG.Command
 {
@@ -13,11 +19,15 @@ namespace RePKG.Command
     {
         private static readonly IPackageReader _packageReader;
         private static readonly IPackageWriter _packageWriter;
+        private static readonly ITexReader _texReader;
+        private static readonly TexToImageConverter _texToImage;
 
         static Replace()
         {
             _packageReader = new PackageReader { ReadEntryBytes = true };
             _packageWriter = new PackageWriter();
+            _texReader = TexReader.Default;
+            _texToImage = new TexToImageConverter();
         }
 
         public static void Action(ReplaceOptions options)
@@ -44,7 +54,6 @@ namespace RePKG.Command
                 return;
             }
 
-            // Read input package
             Console.WriteLine($"Reading: {inputPath}");
 
             Package package;
@@ -55,13 +64,11 @@ namespace RePKG.Command
 
             Console.WriteLine($"Entries: {package.Entries.Count}, Magic: {package.Magic}");
 
-            // Apply replacements
             for (int i = 0; i < pkgPaths.Count; i++)
             {
                 var pkgPath = pkgPaths[i].Replace('\\', '/');
                 var filePath = filePaths[i];
 
-                // Find matching entry
                 var entry = package.Entries.FirstOrDefault(e =>
                     e.FullPath.Equals(pkgPath, StringComparison.OrdinalIgnoreCase) ||
                     e.FullPath.Replace('\\', '/').Equals(pkgPath, StringComparison.OrdinalIgnoreCase));
@@ -75,21 +82,39 @@ namespace RePKG.Command
                     return;
                 }
 
-                // Read replacement file
                 if (!File.Exists(filePath))
                 {
                     Console.WriteLine($"Replacement file not found: {filePath}");
                     return;
                 }
 
-                var newBytes = File.ReadAllBytes(filePath);
+                byte[] newBytes;
+
+                if (entry.Type == EntryType.Tex && ShouldConvert(filePath, options.ForceConvert))
+                {
+                    if (options.ForceConvert && Path.GetExtension(filePath) == ".tex")
+                    {
+                        Console.WriteLine($"Re-encoding: {filePath} -> TEX");
+                        newBytes = ReencodeTexFile(filePath);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Converting: {filePath} -> TEX");
+                        newBytes = ConvertToTexBytes(filePath, options.VideoWidth, options.VideoHeight);
+                    }
+                }
+                else
+                {
+                    newBytes = File.ReadAllBytes(filePath);
+                }
+
                 entry.Bytes = newBytes;
                 entry.Type = PackageEntryTypeGetter.GetFromFileName(entry.FullPath);
+                entry.Length = newBytes.Length;
 
                 Console.WriteLine($"Replaced: {entry.FullPath} ({newBytes.Length} bytes)");
             }
 
-            // Write output package
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)));
 
             using (var writer = new BinaryWriter(File.Create(outputPath)))
@@ -99,6 +124,167 @@ namespace RePKG.Command
 
             Console.WriteLine($"Package written: {outputPath}");
             Console.WriteLine($"Entries: {package.Entries.Count}, Magic: {package.Magic}");
+        }
+
+        private static readonly HashSet<string> ImageExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tga", ".tiff", ".tif", ".gif"
+        };
+
+        private static bool ShouldConvert(string path, bool forceConvert)
+        {
+            var ext = Path.GetExtension(path);
+            if (forceConvert) return true;
+            if (ext == ".tex") return false;
+            if (ImageToTexConverter.IsVideoFile(path)) return true;
+            return ImageExts.Contains(ext);
+        }
+
+        private static byte[] ReencodeTexFile(string filePath)
+        {
+            // Read existing TEX
+            ITex tex;
+            using (var reader = new BinaryReader(File.OpenRead(filePath)))
+            {
+                tex = _texReader.ReadFrom(reader);
+            }
+
+            if (tex.IsVideoTexture)
+            {
+                // Video TEX: extract MP4 bytes, re-wrap in video TEX
+                var mp4Bytes = tex.FirstImage.FirstMipmap.Bytes;
+                var width = tex.Header.TextureWidth;
+                var height = tex.Header.TextureHeight;
+                return BuildVideoTexBytes(mp4Bytes, width, height);
+            }
+
+            // Image or GIF: convert to PNG, reload, re-encode
+            var result = _texToImage.ConvertToImage(tex);
+
+            if (result.Format == MipmapFormat.ImagePNG)
+            {
+                using (var ms = new MemoryStream(result.Bytes))
+                using (var image = SixLabors.ImageSharp.Image.Load<Rgba32>(ms))
+                {
+                    var newTex = ImageToTexConverter.Convert(image, TexFormat.RGBA8888, false);
+                    using (var outMs = new MemoryStream())
+                    using (var writer = new BinaryWriter(outMs))
+                    {
+                        TexWriter.Default.WriteTo(writer, newTex);
+                        return outMs.ToArray();
+                    }
+                }
+            }
+
+            if (result.Format == MipmapFormat.ImageGIF)
+            {
+                // Save GIF to temp, re-convert
+                var tmp = Path.GetTempFileName();
+                try
+                {
+                    File.WriteAllBytes(tmp, result.Bytes);
+                    var newTex = ImageToTexConverter.ConvertFromGif(tmp, false);
+                    using (var outMs = new MemoryStream())
+                    using (var writer = new BinaryWriter(outMs))
+                    {
+                        TexWriter.Default.WriteTo(writer, newTex);
+                        return outMs.ToArray();
+                    }
+                }
+                finally
+                {
+                    File.Delete(tmp);
+                }
+            }
+
+            // Fallback: raw copy
+            return File.ReadAllBytes(filePath);
+        }
+
+        private static byte[] BuildVideoTexBytes(byte[] mp4Data, int width, int height)
+        {
+            var mipmap = new TexMipmap
+            {
+                Width = width,
+                Height = height,
+                Bytes = mp4Data,
+                Format = MipmapFormat.VideoMp4,
+                IsLZ4Compressed = false,
+                DecompressedBytesCount = mp4Data.Length
+            };
+
+            var texImage = new TexImage();
+            texImage.Mipmaps.Add(mipmap);
+
+            var imageContainer = new TexImageContainer
+            {
+                Magic = "TEXB0004",
+                ImageContainerVersion = TexImageContainerVersion.Version4,
+                ImageFormat = FreeImageFormat.FIF_UNKNOWN
+            };
+            imageContainer.Images.Add(texImage);
+
+            var header = new TexHeader
+            {
+                Format = TexFormat.RGBA8888,
+                Flags = TexFlags.IsVideoTexture | TexFlags.ClampUVs,
+                TextureWidth = width,
+                TextureHeight = height,
+                ImageWidth = width,
+                ImageHeight = height,
+                UnkInt0 = 0
+            };
+
+            var tex = new Tex
+            {
+                Magic1 = "TEXV0005",
+                Magic2 = "TEXI0001",
+                Header = header,
+                ImagesContainer = imageContainer
+            };
+
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                TexWriter.Default.WriteTo(writer, tex);
+                return ms.ToArray();
+            }
+        }
+
+        private static bool IsAutoConvertFile(string path)
+        {
+            var ext = Path.GetExtension(path);
+            if (ext == ".tex") return false;
+            if (ImageToTexConverter.IsVideoFile(path)) return true;
+            return ImageExts.Contains(ext);
+        }
+
+        private static byte[] ConvertToTexBytes(string filePath, int videoWidth, int videoHeight)
+        {
+            var isVideo = ImageToTexConverter.IsVideoFile(filePath);
+            var ext = Path.GetExtension(filePath);
+            var isGif = ext.Equals(".gif", StringComparison.OrdinalIgnoreCase) && !isVideo;
+
+            Tex tex;
+            if (isVideo)
+            {
+                tex = ImageToTexConverter.ConvertFromVideo(filePath, videoWidth, videoHeight, false);
+            }
+            else if (isGif)
+            {
+                tex = ImageToTexConverter.ConvertFromGif(filePath, false);
+            }
+            else
+            {
+                tex = ImageToTexConverter.Convert(filePath, TexFormat.RGBA8888, false);
+            }
+
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                TexWriter.Default.WriteTo(writer, tex);
+                return ms.ToArray();
+            }
         }
     }
 
@@ -113,6 +299,15 @@ namespace RePKG.Command
 
         [Option('f', "file", Required = true, HelpText = "Local file to replace with (paired with -r by index)", Min = 1)]
         public IEnumerable<string> Files { get; set; }
+
+        [Option('F', "force-convert", Required = false, HelpText = "Force re-encode even when replacing .tex with .tex")]
+        public bool ForceConvert { get; set; }
+
+        [Option("video-width", Required = false, HelpText = "Video width in pixels (auto-detected if omitted)")]
+        public int VideoWidth { get; set; }
+
+        [Option("video-height", Required = false, HelpText = "Video height in pixels (auto-detected if omitted)")]
+        public int VideoHeight { get; set; }
 
         [Value(0, Required = true, HelpText = "Input PKG/MPKG path", MetaName = "Input")]
         public string Input { get; set; }

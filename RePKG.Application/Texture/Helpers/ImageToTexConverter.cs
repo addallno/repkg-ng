@@ -19,11 +19,8 @@ namespace RePKG.Application.Texture.Helpers
 
         public static Tex Convert(Image<Rgba32> image, TexFormat format = TexFormat.RGBA8888, bool lz4 = false)
         {
-            var texWidth = NextPowerOfTwo(image.Width);
-            var texHeight = NextPowerOfTwo(image.Height);
-
-            if (image.Width != texWidth || image.Height != texHeight)
-                image.Mutate(x => x.Resize(texWidth, texHeight));
+            var texWidth = image.Width;
+            var texHeight = image.Height;
 
             var pixels = new Rgba32[texWidth * texHeight];
             image.CopyPixelDataTo(pixels);
@@ -88,8 +85,8 @@ namespace RePKG.Application.Texture.Helpers
                 if (frames == 0)
                     return Convert(gif, TexFormat.RGBA8888, lz4);
 
-                var texWidth = NextPowerOfTwo(gif.Width);
-                var texHeight = NextPowerOfTwo(gif.Height);
+                var texWidth = gif.Width;
+                var texHeight = gif.Height;
 
                 var header = new TexHeader
                 {

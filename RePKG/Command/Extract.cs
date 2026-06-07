@@ -240,6 +240,12 @@ namespace RePKG.Command
 
         private static IEnumerable<PackageEntry> FilterEntries(IEnumerable<PackageEntry> entries)
         {
+            // Filter out TEX entries when --no-tex is set
+            if (_options.NoTex)
+            {
+                entries = entries.Where(e => e.Type != EntryType.Tex);
+            }
+
             if (!string.IsNullOrEmpty(_options.IgnoreExts))
             {
                 return from entry in entries
@@ -406,6 +412,9 @@ namespace RePKG.Command
 
         [Option('n', "usename", HelpText = "Use name from project.json as project subfolder name instead of id")]
         public bool UseName { get; set; }
+
+        [Option('T', "no-tex", HelpText = "Skip all .tex entries (extract only non-TEX files)")]
+        public bool NoTex { get; set; }
 
         [Option("no-tex-convert", HelpText = "Don't convert TEX files into images while extracting PKG")]
         public bool NoTexConvert { get; set; }
