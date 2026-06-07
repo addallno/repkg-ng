@@ -41,7 +41,7 @@ namespace RePKG.Command
                 var idx = r.IndexOf('=');
                 if (idx <= 0 || idx >= r.Length - 1)
                 {
-                    Console.WriteLine($"Invalid --replace format: {r} (expected pkgpath=filepath)");
+                    Console.WriteLine($"Invalid --replace format: {r} (expected path=filepath)");
                     return;
                 }
                 var pkgPath = r.Substring(0, idx).Trim();
@@ -51,7 +51,7 @@ namespace RePKG.Command
 
             if (replacements.Count == 0)
             {
-                Console.WriteLine("No replacements specified. Use --replace pkgpath=filepath");
+                Console.WriteLine("No replacements specified. Use --replace path=filepath");
                 return;
             }
 
@@ -119,7 +119,7 @@ namespace RePKG.Command
         [Option('o', "output", Required = false, HelpText = "Output PKG/MPKG path (default: input.replaced.pkg)")]
         public string Output { get; set; }
 
-        [Option('r', "replace", Required = true, HelpText = "Replace mapping: pkgpath=filepath (can be specified multiple times)", Min = 1)]
+        [Option('r', "replace", Required = true, HelpText = "Replace mapping: path=filepath (can be specified multiple times)", Min = 1)]
         public IEnumerable<string> Replacements { get; set; }
 
         [Value(0, Required = true, HelpText = "Input PKG/MPKG path", MetaName = "Input")]
