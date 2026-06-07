@@ -85,7 +85,7 @@ repkg replace input.mpkg -r scene.json=./new_scene.json
 # → input.replaced.mpkg
 ```
 
-> **注意**：`-r` 参数的 `pkgpath` 必须与包内条目的完整路径**完全一致**（包括子目录前缀），
+> **注意**：`-r` 参数的 `path` 必须与包内条目的完整路径**完全一致**（包括子目录前缀），
 > 可通过 `info` 命令查看所有条目路径。例如条目路径为 `textures/clock.tex`，
 > 则 `-r textures/clock.tex=/path/to/new.tex`。路径分隔符统一使用 `/`。
 
