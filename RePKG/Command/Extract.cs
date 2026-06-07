@@ -420,7 +420,7 @@ namespace RePKG.Command
         [Option("overwrite", HelpText = "覆盖所有已存在的文件")]
         public bool Overwrite { get; set; }
 
-        [Option("english", Required = false, HelpText = "Display output in English")]
+        [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
         [Value(0, Required = true, HelpText = "Path to file/directory", MetaName = "Input")]

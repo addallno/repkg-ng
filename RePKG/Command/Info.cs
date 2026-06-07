@@ -112,8 +112,17 @@ namespace RePKG.Command
             var texCount = entries.Count(e => e.Type == EntryType.Tex);
             var binCount = entries.Count - texCount;
 
+            // Extract project.json for field filtering
+            var projectJson = ReadProjectJson(file, package);
+
+            if (!string.IsNullOrEmpty(_options.OnlyFields))
+            {
+                PrintOnlyFields(_options.OnlyFields, package, projectJson, file.Length, texCount, binCount);
+                return;
+            }
+
             Console.WriteLine($"\r\n### Package: {name}");
-            PrintProjectJsonFields(file, package);
+            PrintProjectJsonFields(file, package, projectJson);
             Console.WriteLine($"  Magic:          {package.Magic}");
             Console.WriteLine(T($"  文件大小:       ", "  File size:      ") + FormatSize(file.Length));
             Console.WriteLine(T($"  条目数:         ", "  Entries:        ") + $"{entries.Count} ({texCount} tex, {binCount} other)");
@@ -159,10 +168,8 @@ namespace RePKG.Command
             }
         }
 
-        private static void PrintProjectJsonFields(FileInfo file, Package package)
+        private static JObject ReadProjectJson(FileInfo file, Package package)
         {
-            JObject projectJson = null;
-
             var projectEntry = package.Entries.FirstOrDefault(e =>
                 e.FullPath.Equals("project.json", StringComparison.OrdinalIgnoreCase));
 
@@ -174,31 +181,28 @@ namespace RePKG.Command
                     var bytes = reader.ReadBytes(projectEntry.Length);
                     if (bytes != null && bytes.Length > 0)
                     {
-                        try
-                        {
-                            projectJson = JObject.Parse(Encoding.UTF8.GetString(bytes));
-                        }
-                        catch { }
+                        try { return JObject.Parse(Encoding.UTF8.GetString(bytes)); } catch { }
                     }
                 }
             }
 
-            if (projectJson == null)
+            var directory = file.Directory;
+            if (directory != null)
             {
-                var directory = file.Directory;
-                if (directory != null)
+                var projectFiles = directory.GetFiles("project.json");
+                if (projectFiles.Length > 0 && projectFiles[0].Exists)
                 {
-                    var projectFiles = directory.GetFiles("project.json");
-                    if (projectFiles.Length > 0 && projectFiles[0].Exists)
-                    {
-                        try
-                        {
-                            projectJson = JObject.Parse(File.ReadAllText(projectFiles[0].FullName));
-                        }
-                        catch { }
-                    }
+                    try { return JObject.Parse(File.ReadAllText(projectFiles[0].FullName)); } catch { }
                 }
             }
+
+            return null;
+        }
+
+        private static void PrintProjectJsonFields(FileInfo file, Package package, JObject projectJson = null)
+        {
+            if (projectJson == null)
+                projectJson = ReadProjectJson(file, package);
 
             if (projectJson == null)
                 return;
@@ -298,6 +302,60 @@ namespace RePKG.Command
                         Console.WriteLine($"  {key}: {val}");
                 }
             }
+        }
+
+        private static void PrintOnlyFields(string onlyStr, Package package, JObject projectJson, long fileSize, int texCount, int binCount)
+        {
+            var fields = onlyStr.Split(',')
+                .Select(f => f.Trim().ToLowerInvariant())
+                .ToList();
+
+            foreach (var field in fields)
+            {
+                switch (field)
+                {
+                    case "title":
+                        Console.WriteLine(projectJson?.Value<string>("title") ?? "");
+                        break;
+                    case "author":
+                        Console.WriteLine(ExtractAuthorFromProject(projectJson));
+                        break;
+                    case "count":
+                        Console.WriteLine(package.Entries.Count);
+                        break;
+                    case "magic":
+                        Console.WriteLine(package.Magic);
+                        break;
+                    case "type":
+                        Console.WriteLine(projectJson?.Value<string>("type") ?? "");
+                        break;
+                    case "tags":
+                        var tags = projectJson?["tags"];
+                        if (tags is JArray tagArray && tagArray.Count > 0)
+                            Console.WriteLine(string.Join(", ", tagArray.Select(t => t.ToString())));
+                        break;
+                    case "entries":
+                        foreach (var entry in package.Entries)
+                            Console.WriteLine(entry.FullPath);
+                        break;
+                }
+            }
+        }
+
+        private static string ExtractAuthorFromProject(JObject projectJson)
+        {
+            if (projectJson == null) return "";
+            var author = projectJson.Value<string>("author");
+            if (!string.IsNullOrEmpty(author)) return author;
+            var workshopId = projectJson.Value<string>("workshopid");
+            var desc = projectJson.Value<string>("description");
+            if (!string.IsNullOrEmpty(desc))
+            {
+                var firstLine = desc.Split('\n')[0].Trim();
+                if (firstLine.Length > 0 && firstLine.Length < 80)
+                    return firstLine;
+            }
+            return workshopId ?? "";
         }
 
         private static void InfoTex(FileInfo file)
@@ -443,7 +501,7 @@ namespace RePKG.Command
         [Option('a', "all", Required = false, HelpText = "显示所有详细信息（完整 project.json + 条目列表）")]
         public bool AllMode { get; set; }
 
-        [Option('e', "printentries", HelpText = "列出包内所有文件条目")]
+        [Option('e', "entries", HelpText = "列出包内所有文件条目")]
         public bool PrintEntries { get; set; }
 
         [Option("tex-only", Required = false, HelpText = "仅显示纹理(TEX)条目（需配合 -e 使用）")]
@@ -467,7 +525,10 @@ namespace RePKG.Command
         [Option("title-filter", HelpText = "按标题关键词过滤")]
         public string TitleFilter { get; set; }
 
-        [Option("english", Required = false, HelpText = "Display output in English")]
+        [Option("only", Required = false, HelpText = "仅显示指定字段: title,author,count,magic,entries,type,tags (逗号分隔)")]
+        public string OnlyFields { get; set; }
+
+        [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
     }
 }

@@ -89,7 +89,7 @@ namespace RePKG.Command
         [Option("desktop", Required = false, HelpText = "转换为桌面 PKG 格式 (PKGV0005)")]
         public bool Desktop { get; set; }
 
-        [Option("english", Required = false, HelpText = "Display output in English")]
+        [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
         [Value(0, Required = true, HelpText = "输入 PKG/MPKG 文件路径", MetaName = "Input")]

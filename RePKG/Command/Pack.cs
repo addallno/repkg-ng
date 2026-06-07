@@ -179,7 +179,7 @@ namespace RePKG.Command
         [Option("video-height", Required = false, HelpText = "视频高度（像素），省略时自动通过 ffprobe 检测")]
         public int VideoHeight { get; set; }
 
-        [Option("english", Required = false, HelpText = "Display output in English")]
+        [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
         [Value(0, Required = true, HelpText = "输入文件或目录路径", MetaName = "Input")]

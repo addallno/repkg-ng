@@ -302,7 +302,7 @@ namespace RePKG.Command
         [Option('f', "file", Required = true, HelpText = "本地替换文件路径（与 -r 按顺序配对）", Min = 1)]
         public IEnumerable<string> Files { get; set; }
 
-        [Option('F', "force-convert", Required = false, HelpText = "强制重编码：即使替换 .tex 也重新编码")]
+        [Option('F', "force", Required = false, HelpText = "强制重编码：即使替换 .tex 也重新编码")]
         public bool ForceConvert { get; set; }
 
         [Option("no-lz4", Required = false, HelpText = "禁用 LZ4 mipmap 压缩（默认启用）")]
@@ -314,7 +314,7 @@ namespace RePKG.Command
         [Option("video-height", Required = false, HelpText = "视频高度（像素），省略时自动检测")]
         public int VideoHeight { get; set; }
 
-        [Option("english", Required = false, HelpText = "Display output in English")]
+        [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
         [Value(0, Required = true, HelpText = "输入 PKG/MPKG 文件路径", MetaName = "Input")]
