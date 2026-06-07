@@ -39,6 +39,7 @@ namespace RePKG.Command
         public static void Action(ExtractOptions options)
         {
             _options = options;
+            Program.EnglishMode = options.English;
 
             if (string.IsNullOrEmpty(options.OutputDirectory))
             {
@@ -383,44 +384,44 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("extract", HelpText = "Extract PKG/Convert TEX into image.")]
+    [Verb("extract", HelpText = "解包 PKG/MPKG 文件，或将 TEX 纹理转换为图片")]
     public class ExtractOptions
     {
-        [Option('o', "output", Required = false, HelpText = "Output directory", Default = "./output")]
+        [Option('o', "output", Required = false, HelpText = "输出目录", Default = "./output")]
         public string OutputDirectory { get; set; }
 
-        [Option('i', "ignoreexts", HelpText =
-            "Don't extract files with specified extensions (delimited by comma \",\")")]
+        [Option('i', "ignoreexts", HelpText = "排除指定扩展名的文件（多个用逗号分隔）")]
         public string IgnoreExts { get; set; }
 
-        [Option('e', "onlyexts", HelpText = "Only extract files with specified extensions (delimited by comma \",\")")]
+        [Option('e', "onlyexts", HelpText = "只提取指定扩展名的文件（多个用逗号分隔）")]
         public string OnlyExts { get; set; }
 
-        [Option('t', "tex", HelpText = "Convert all tex files into images from specified directory in input")]
+        [Option('t', "tex", HelpText = "将目录下所有 TEX 文件转换为图片")]
         public bool TexDirectory { get; set; }
 
-        [Option('s', "singledir", HelpText =
-            "Should all extracted files be put in one directory instead of their entry path")]
+        [Option('s', "singledir", HelpText = "将所有文件提取到单一目录而不是保持目录结构")]
         public bool SingleDir { get; set; }
 
-        [Option('r', "recursive", HelpText = "Recursive search in all subfolders of specified directory")]
+        [Option('r', "recursive", HelpText = "递归搜索指定目录下的所有子目录")]
         public bool Recursive { get; set; }
 
-        [Option('c', "copyproject", HelpText =
-            "Copy project.json and preview.jpg from beside PKG into output directory")]
+        [Option('c', "copyproject", HelpText = "从 PKG 所在目录复制 project.json 和预览图到输出目录")]
         public bool CopyProject { get; set; }
 
-        [Option('n', "usename", HelpText = "Use name from project.json as project subfolder name instead of id")]
+        [Option('n', "usename", HelpText = "使用 project.json 中的名称作为项目子目录名")]
         public bool UseName { get; set; }
 
-        [Option('T', "no-tex", HelpText = "Skip all .tex entries (extract only non-TEX files)")]
+        [Option('T', "no-tex", HelpText = "跳过所有 .tex 条目（只提取非纹理文件）")]
         public bool NoTex { get; set; }
 
-        [Option("no-tex-convert", HelpText = "Don't convert TEX files into images while extracting PKG")]
+        [Option("no-tex-convert", HelpText = "提取 PKG 时不将 TEX 文件转换为图片")]
         public bool NoTexConvert { get; set; }
 
-        [Option("overwrite", HelpText = "Overwrite all existing files")]
+        [Option("overwrite", HelpText = "覆盖所有已存在的文件")]
         public bool Overwrite { get; set; }
+
+        [Option("english", Required = false, HelpText = "Display output in English")]
+        public bool English { get; set; }
 
         [Value(0, Required = true, HelpText = "Path to file/directory", MetaName = "Input")]
         public string Input { get; set; }

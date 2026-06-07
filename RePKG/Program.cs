@@ -7,6 +7,7 @@ namespace RePKG
     internal class Program
     {
         public static bool Closing;
+        public static bool EnglishMode;
 
         private static void Main(string[] args)
         {
@@ -18,11 +19,14 @@ namespace RePKG
                 return;
             }
 
-            Parser.Default.ParseArguments<ExtractOptions, InfoOptions, PackOptions, ReplaceOptions>(args)
+            Parser.Default.ParseArguments<
+                ExtractOptions, InfoOptions, PackOptions,
+                ReplaceOptions, ConvertOptions>(args)
                 .WithParsed<ExtractOptions>(Extract.Action)
                 .WithParsed<InfoOptions>(Info.Action)
                 .WithParsed<PackOptions>(Pack.Action)
-                .WithParsed<ReplaceOptions>(Replace.Action);
+                .WithParsed<ReplaceOptions>(Replace.Action)
+                .WithParsed<ConvertOptions>(RePKG.Command.Convert.Action);
         }
 
         private static void Cancel(object sender, ConsoleCancelEventArgs e)
@@ -43,11 +47,14 @@ namespace RePKG
             {
                 var interactiveArgs = line.SplitArguments();
 
-                Parser.Default.ParseArguments<ExtractOptions, InfoOptions, PackOptions, ReplaceOptions>(interactiveArgs)
+                Parser.Default.ParseArguments<
+                    ExtractOptions, InfoOptions, PackOptions,
+                    ReplaceOptions, ConvertOptions>(interactiveArgs)
                     .WithParsed<ExtractOptions>(Extract.Action)
                     .WithParsed<InfoOptions>(Info.Action)
                     .WithParsed<PackOptions>(Pack.Action)
-                    .WithParsed<ReplaceOptions>(Replace.Action);
+                    .WithParsed<ReplaceOptions>(Replace.Action)
+                .WithParsed<ConvertOptions>(RePKG.Command.Convert.Action);
             }
         }
     }

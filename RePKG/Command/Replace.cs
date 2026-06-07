@@ -32,6 +32,7 @@ namespace RePKG.Command
 
         public static void Action(ReplaceOptions options)
         {
+            Program.EnglishMode = options.English;
             var inputPath = options.Input;
             var outputPath = options.Output;
 
@@ -289,31 +290,34 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("replace", HelpText = "Replace files inside PKG/MPKG without full repack.")]
+    [Verb("replace", HelpText = "替换 PKG/MPKG 内部文件，无需完整解包/打包")]
     public class ReplaceOptions
     {
-        [Option('o', "output", Required = false, HelpText = "Output PKG/MPKG path (default: input.replaced.pkg)")]
+        [Option('o', "output", Required = false, HelpText = "输出 PKG/MPKG 路径（默认: input.replaced.pkg）")]
         public string Output { get; set; }
 
-        [Option('r', "replace", Required = true, HelpText = "Path inside the package (can be specified multiple times)", Min = 1)]
+        [Option('r', "replace", Required = true, HelpText = "包内文件路径（可多次指定）", Min = 1)]
         public IEnumerable<string> Replacements { get; set; }
 
-        [Option('f', "file", Required = true, HelpText = "Local file to replace with (paired with -r by index)", Min = 1)]
+        [Option('f', "file", Required = true, HelpText = "本地替换文件路径（与 -r 按顺序配对）", Min = 1)]
         public IEnumerable<string> Files { get; set; }
 
-        [Option('F', "force-convert", Required = false, HelpText = "Force re-encode even when replacing .tex with .tex")]
+        [Option('F', "force-convert", Required = false, HelpText = "强制重编码：即使替换 .tex 也重新编码")]
         public bool ForceConvert { get; set; }
 
-        [Option("no-lz4", Required = false, HelpText = "Disable LZ4 mipmap compression (enabled by default)")]
+        [Option("no-lz4", Required = false, HelpText = "禁用 LZ4 mipmap 压缩（默认启用）")]
         public bool NoLz4 { get; set; }
 
-        [Option("video-width", Required = false, HelpText = "Video width in pixels (auto-detected if omitted)")]
+        [Option("video-width", Required = false, HelpText = "视频宽度（像素），省略时自动检测")]
         public int VideoWidth { get; set; }
 
-        [Option("video-height", Required = false, HelpText = "Video height in pixels (auto-detected if omitted)")]
+        [Option("video-height", Required = false, HelpText = "视频高度（像素），省略时自动检测")]
         public int VideoHeight { get; set; }
 
-        [Value(0, Required = true, HelpText = "Input PKG/MPKG path", MetaName = "Input")]
+        [Option("english", Required = false, HelpText = "Display output in English")]
+        public bool English { get; set; }
+
+        [Value(0, Required = true, HelpText = "输入 PKG/MPKG 文件路径", MetaName = "Input")]
         public string Input { get; set; }
     }
 }

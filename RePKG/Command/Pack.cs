@@ -22,6 +22,8 @@ namespace RePKG.Command
 
         public static void Action(PackOptions options)
         {
+            Program.EnglishMode = options.English;
+
             var fileInfo = new FileInfo(options.Input);
             var dirInfo = new DirectoryInfo(options.Input);
 
@@ -150,34 +152,37 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("pack", HelpText = "Pack file to .tex or directory to PKG/MPKG.")]
+    [Verb("pack", HelpText = "将目录打包为 PKG/MPKG，或将图片/视频/纹理转换为 TEX 格式")]
     public class PackOptions
     {
-        [Option('o', "output", Required = false, HelpText = "Output path (.tex for file, .pkg/.mpkg for directory)")]
+        [Option('o', "output", Required = false, HelpText = "输出路径（.tex 为纹理文件，.pkg/.mpkg 为包文件）")]
         public string Output { get; set; }
 
-        [Option('m', "magic", Required = false, HelpText = "Magic string for PKG header: PKGV0005 (desktop, default for .pkg) or PKGM0019 (Android, default for .mpkg)")]
+        [Option('m', "magic", Required = false, HelpText = "PKG 头部魔术字：PKGV0005（桌面版，.pkg 默认）/ PKGM0019（Android 版，.mpkg 默认）")]
         public string Magic { get; set; }
 
-        [Option("mpkg", Required = false, HelpText = "Create .mpkg package with PKGM0019 magic (Android Wallpaper Engine)")]
+        [Option("mpkg", Required = false, HelpText = "创建 Android MPKG（魔术字 PKGM0019）")]
         public bool Mpkg { get; set; }
 
-        [Option('f', "format", Required = false, HelpText = "Tex format: RGBA8888, R8, RG88 (file mode only)")]
+        [Option('f', "format", Required = false, HelpText = "纹理像素格式：RGBA8888, R8, RG88（仅文件模式）")]
         public string Format { get; set; }
 
-        [Option("lz4", Required = false, HelpText = "Apply LZ4 compression (file mode only)")]
+        [Option("lz4", Required = false, HelpText = "启用 LZ4 压缩（仅文件模式）")]
         public bool Lz4 { get; set; }
 
-        [Option("no-gif", Required = false, HelpText = "Treat GIF as single frame (file mode only)")]
+        [Option("no-gif", Required = false, HelpText = "将 GIF 视为单帧图像处理（仅文件模式）")]
         public bool NoGif { get; set; }
 
-        [Option("video-width", Required = false, HelpText = "Video width in pixels (auto-detected via ffprobe if omitted)")]
+        [Option("video-width", Required = false, HelpText = "视频宽度（像素），省略时自动通过 ffprobe 检测")]
         public int VideoWidth { get; set; }
 
-        [Option("video-height", Required = false, HelpText = "Video height in pixels (auto-detected via ffprobe if omitted)")]
+        [Option("video-height", Required = false, HelpText = "视频高度（像素），省略时自动通过 ffprobe 检测")]
         public int VideoHeight { get; set; }
 
-        [Value(0, Required = true, HelpText = "Input file or directory path", MetaName = "Input")]
+        [Option("english", Required = false, HelpText = "Display output in English")]
+        public bool English { get; set; }
+
+        [Value(0, Required = true, HelpText = "输入文件或目录路径", MetaName = "Input")]
         public string Input { get; set; }
     }
 }

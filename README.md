@@ -42,6 +42,7 @@ repkg info ./wallpaper.pkg
 | `info` | 查看 `.pkg`/`.mpkg`/`.tex` 文件信息 |
 | `pack` | 目录 → `.pkg`/`.mpkg`；图片/视频 → `.tex` |
 | `replace` | 替换 `.pkg`/`.mpkg` 内部文件，无需完整解包/打包 |
+| `convert` | PKG/MPKG 格式互转（桌面 ↔ Android） |
 
 ### pack 命令（新增）
 回应 [#72](https://github.com/notscuffed/repkg/issues/72) — 打包功能请求。
@@ -155,6 +156,12 @@ repkg pack ./output -o wallpaper.mpkg    # Android .mpkg
 repkg pack ./output -o wallpaper.pkg     # 桌面 .pkg
 repkg pack video.mp4                      # MP4 → video.tex
 repkg pack image.png -f R8                # PNG → R8纹理
+```
+
+# 格式转换
+repkg convert wallpaper.pkg -o wallpaper.mpkg                          # 桌面 → Android
+repkg convert wallpaper.mpkg -o wallpaper.pkg                          # Android → 桌面
+repkg convert input.mpkg -o output.mpkg --android                      # 强制指定
 ```
 
 > **重要提示**：解包后修改文件再重打包时，`project.json` 必须保留在输出目录中，

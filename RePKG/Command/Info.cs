@@ -32,6 +32,7 @@ namespace RePKG.Command
         public static void Action(InfoOptions options)
         {
             _options = options;
+            Program.EnglishMode = options.English;
 
             if (string.IsNullOrEmpty(_options.ProjectInfo))
                 _projectInfoToPrint = null;
@@ -54,7 +55,7 @@ namespace RePKG.Command
                     return;
                 }
 
-                Console.WriteLine("Input file/directory doesn't exist!");
+                Console.WriteLine(T("输入文件不存在!", "Input file/directory doesn't exist!"));
                 Console.WriteLine(options.Input);
                 return;
             }
@@ -62,6 +63,8 @@ namespace RePKG.Command
             InfoFile(fileInfo);
             Console.WriteLine("Done");
         }
+
+        private static string T(string zh, string en) => Program.EnglishMode ? en : zh;
 
         private static void InfoPkgDirectory(DirectoryInfo directoryInfo)
         {
@@ -93,7 +96,7 @@ namespace RePKG.Command
             else if (file.Extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
                 InfoTex(file);
             else
-                Console.WriteLine($"Unrecognized file extension: {file.Extension}");
+                Console.WriteLine(T($"不支持的文件扩展名: {file.Extension}", $"Unrecognized file extension: {file.Extension}"));
         }
 
         private static void InfoPkg(FileInfo file, string name)
@@ -112,32 +115,46 @@ namespace RePKG.Command
             Console.WriteLine($"\r\n### Package: {name}");
             PrintProjectJsonFields(file, package);
             Console.WriteLine($"  Magic:          {package.Magic}");
-            Console.WriteLine($"  File size:      {FormatSize(file.Length)}");
-            Console.WriteLine($"  Entries:        {entries.Count} ({texCount} tex, {binCount} other)");
-            Console.WriteLine($"  Header size:    {package.HeaderSize} bytes");
-            Console.WriteLine($"  Data size:      {FormatSize(totalDataSize)}");
+            Console.WriteLine(T($"  文件大小:       ", "  File size:      ") + FormatSize(file.Length));
+            Console.WriteLine(T($"  条目数:         ", "  Entries:        ") + $"{entries.Count} ({texCount} tex, {binCount} other)");
+            Console.WriteLine(T($"  头部大小:       ", "  Header size:    ") + $"{package.HeaderSize} bytes");
+            Console.WriteLine(T($"  数据大小:       ", "  Data size:      ") + FormatSize(totalDataSize));
 
-            if (_options.PrintEntries)
+            // Apply type filter for entry display
+            var displayEntries = entries;
+            if (_options.TexOnly)
+                displayEntries = entries.Where(e => e.Type == EntryType.Tex).ToList();
+            else if (_options.BinOnly)
+                displayEntries = entries.Where(e => e.Type != EntryType.Tex).ToList();
+
+            if (_options.PrintEntries || _options.AllMode)
             {
                 Console.WriteLine();
-                Console.WriteLine("  Entries:");
+                Console.WriteLine(T("  条目列表:", "  Entries:"));
 
                 if (_options.Sort)
                 {
                     if (_options.SortBy == "extension")
-                        entries.Sort((a, b) =>
+                        displayEntries.Sort((a, b) =>
                             String.Compare(a.Extension, b.Extension, StringComparison.OrdinalIgnoreCase));
                     else if (_options.SortBy == "size")
-                        entries.Sort((a, b) => a.Length.CompareTo(b.Length));
+                        displayEntries.Sort((a, b) => a.Length.CompareTo(b.Length));
                     else
-                        entries.Sort((a, b) =>
+                        displayEntries.Sort((a, b) =>
                             String.Compare(a.FullPath, b.FullPath, StringComparison.OrdinalIgnoreCase));
                 }
 
-                foreach (var entry in entries)
+                foreach (var entry in displayEntries)
                 {
                     var label = entry.Type == EntryType.Tex ? "TEX" : "BIN";
                     Console.WriteLine($"  * {entry.FullPath,-55} {label,5} {entry.Length,10} bytes  [0x{entry.Offset:X8}]");
+                }
+
+                if (_options.AllMode)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine(T($"    合计: {displayEntries.Count} 个条目, {FormatSize(displayEntries.Sum(e => e.Length))}",
+                        $"    Total: {displayEntries.Count} entries, {FormatSize(displayEntries.Sum(e => e.Length))}"));
                 }
             }
         }
@@ -191,49 +208,69 @@ namespace RePKG.Command
 
             var title = projectJson.Value<string>("title");
             if (!string.IsNullOrEmpty(title))
-                Console.WriteLine($"  Title:          {title}");
+                Console.WriteLine(T($"  标题:           ", "  Title:          ") + title);
 
             var workshopId = projectJson.Value<string>("workshopid");
             if (!string.IsNullOrEmpty(workshopId))
-                Console.WriteLine($"  Workshop ID:    {workshopId}  (WallpaperEngine appid: 431960)");
+                Console.WriteLine(T($"  工坊 ID:        ", "  Workshop ID:    ") + $"{workshopId}  (WallpaperEngine appid: 431960)");
 
             var type = projectJson.Value<string>("type");
             if (!string.IsNullOrEmpty(type))
-                Console.WriteLine($"  Type:           {type}");
+                Console.WriteLine(T($"  类型:           ", "  Type:           ") + type);
 
             var schema = projectJson.Value<string>("schema");
             if (!string.IsNullOrEmpty(schema))
-                Console.WriteLine($"  Schema:         {schema}");
+                Console.WriteLine(T($"  模式:           ", "  Schema:         ") + schema);
 
             var tags = projectJson["tags"];
             if (tags is JArray tagArray && tagArray.Count > 0)
             {
                 var tagStr = string.Join(", ", tagArray.Select(t => t.ToString()));
-                Console.WriteLine($"  Tags:           {tagStr}");
+                Console.WriteLine(T($"  标签:           ", "  Tags:           ") + tagStr);
             }
 
             var description = projectJson.Value<string>("description");
             if (!string.IsNullOrEmpty(description))
             {
                 var desc = description.Length > 120 ? description.Substring(0, 120) + "..." : description;
-                Console.WriteLine($"  Description:    {desc}");
+                Console.WriteLine(T($"  描述:           ", "  Description:    ") + desc);
             }
 
             var visible = projectJson.Value<string>("visible");
             if (!string.IsNullOrEmpty(visible))
-                Console.WriteLine($"  Visible:        {visible}");
+                Console.WriteLine(T($"  可见性:         ", "  Visible:        ") + visible);
 
             var fileStr = projectJson.Value<string>("file");
             if (!string.IsNullOrEmpty(fileStr))
-                Console.WriteLine($"  Main file:      {fileStr}");
+                Console.WriteLine(T($"  主文件:         ", "  Main file:      ") + fileStr);
 
             var preview = projectJson.Value<string>("preview");
             if (!string.IsNullOrEmpty(preview))
-                Console.WriteLine($"  Preview:        {preview}");
+                Console.WriteLine(T($"  预览:           ", "  Preview:        ") + preview);
 
             var contentrating = projectJson.Value<string>("contentrating");
             if (!string.IsNullOrEmpty(contentrating))
-                Console.WriteLine($"  Content rating: {contentrating}");
+                Console.WriteLine(T($"  内容分级:       ", "  Content rating: ") + contentrating);
+
+            // In --all mode, also show any remaining project.json fields
+            if (_options.AllMode)
+            {
+                var printedKeys = new HashSet<string> {
+                    "title", "workshopid", "type", "schema", "tags",
+                    "description", "visible", "file", "preview", "contentrating"
+                };
+
+                foreach (var prop in projectJson.Properties())
+                {
+                    if (printedKeys.Contains(prop.Name.ToLower()))
+                        continue;
+                    var val = projectJson[prop.Name];
+                    if (val == null || val.Type == JTokenType.Null)
+                        Console.WriteLine($"  {prop.Name}: null");
+                    else
+                        Console.WriteLine($"  {prop.Name}: {val}");
+                }
+            }
 
             if (_projectInfoToPrint?.Length > 0)
             {
@@ -278,26 +315,26 @@ namespace RePKG.Command
             var images = container?.Images;
 
             Console.WriteLine($"  Magic:          {tex.Magic1} / {tex.Magic2}");
-            Console.WriteLine($"  Format:         {header.Format} ({(int)header.Format})");
-            Console.WriteLine($"  Flags:          {FormatTexFlags(header.Flags)} ({(int)header.Flags})");
-            Console.WriteLine($"  Texture size:   {header.TextureWidth} x {header.TextureHeight}");
-            Console.WriteLine($"  Image size:     {header.ImageWidth} x {header.ImageHeight}");
-            Console.WriteLine($"  Type:           {(tex.IsVideoTexture ? "Video" : tex.IsGif ? "GIF" : "Static")}");
+            Console.WriteLine(T($"  格式:           ", "  Format:         ") + $"{header.Format} ({(int)header.Format})");
+            Console.WriteLine(T($"  标志:           ", "  Flags:          ") + $"{FormatTexFlags(header.Flags)} ({(int)header.Flags})");
+            Console.WriteLine(T($"  纹理尺寸:       ", "  Texture size:   ") + $"{header.TextureWidth} x {header.TextureHeight}");
+            Console.WriteLine(T($"  图像尺寸:       ", "  Image size:     ") + $"{header.ImageWidth} x {header.ImageHeight}");
+            Console.WriteLine(T($"  类型:           ", "  Type:           ") + $"{(tex.IsVideoTexture ? T("视频", "Video") : tex.IsGif ? "GIF" : T("静态", "Static"))}");
 
             if (container != null)
             {
                 Console.WriteLine();
-                Console.WriteLine("  Image container:");
+                Console.WriteLine(T("  图像容器:", "  Image container:"));
                 Console.WriteLine($"    Magic:              {container.Magic}");
-                Console.WriteLine($"    Image format:       {container.ImageFormat} ({(int)container.ImageFormat})");
-                Console.WriteLine($"    Container version:  {(int)container.ImageContainerVersion} (V{container.ImageContainerVersion.ToString().Replace("Version", "")})");
-                Console.WriteLine($"    Images:             {images?.Count ?? 0}");
+                Console.WriteLine(T($"    图像格式:           ", "    Image format:       ") + $"{container.ImageFormat} ({(int)container.ImageFormat})");
+                Console.WriteLine(T($"    容器版本:           ", "    Container version:  ") + $"{(int)container.ImageContainerVersion} (V{container.ImageContainerVersion.ToString().Replace("Version", "")})");
+                Console.WriteLine(T($"    图像数:             ", "    Images:             ") + $"{images?.Count ?? 0}");
 
                 if (tex.FrameInfoContainer != null)
                 {
                     var fic = tex.FrameInfoContainer;
-                    Console.WriteLine($"    GIF frames:         {fic.Frames.Count}");
-                    Console.WriteLine($"    GIF size:           {fic.GifWidth} x {fic.GifHeight}");
+                    Console.WriteLine(T($"    GIF 帧数:            ", "    GIF frames:         ") + $"{fic.Frames.Count}");
+                    Console.WriteLine(T($"    GIF 尺寸:            ", "    GIF size:           ") + $"{fic.GifWidth} x {fic.GifHeight}");
                 }
 
                 if (images != null)
@@ -311,24 +348,24 @@ namespace RePKG.Command
                         var imageDataSize = mipmaps.Sum(m => m.Bytes?.Length ?? 0);
 
                         Console.WriteLine();
-                        Console.WriteLine($"  Image #{i + 1}:");
-                        Console.WriteLine($"    Mipmaps:            {mipmaps.Count}");
+                        Console.WriteLine(T($"  图像 #", "  Image #") + $"{i + 1}:");
+                        Console.WriteLine(T($"    多级渐远纹理数:     ", "    Mipmaps:            ") + $"{mipmaps.Count}");
 
                         if (first != null)
                         {
-                            Console.WriteLine($"    Width x Height:     {first.Width} x {first.Height}");
-                            Console.WriteLine($"    Format:             {first.Format}");
+                            Console.WriteLine(T($"    宽 x 高:            ", "    Width x Height:     ") + $"{first.Width} x {first.Height}");
+                            Console.WriteLine(T($"    格式:               ", "    Format:             ") + $"{first.Format}");
                         }
 
                         if (mipmaps.Count > 0)
                         {
                             var compressedCount = mipmaps.Count(m => m.IsLZ4Compressed);
-                            Console.WriteLine($"    LZ4 compressed:     {compressedCount}/{mipmaps.Count}");
-                            Console.WriteLine($"    Data size:          {FormatSize(imageDataSize)}");
+                            Console.WriteLine(T($"    LZ4 压缩:           ", "    LZ4 compressed:     ") + $"{compressedCount}/{mipmaps.Count}");
+                            Console.WriteLine(T($"    数据大小:           ", "    Data size:          ") + FormatSize(imageDataSize));
 
                             if (mipmaps.Count > 1)
                             {
-                                Console.WriteLine("    Mipmap chain:");
+                                Console.WriteLine(T("    Mipmap 链:", "    Mipmap chain:"));
                                 for (var j = 0; j < mipmaps.Count; j++)
                                 {
                                     var m = mipmaps[j];
@@ -343,7 +380,7 @@ namespace RePKG.Command
                     }
 
                     Console.WriteLine();
-                    Console.WriteLine($"  Total texture data: {FormatSize(totalDataSize)}");
+                    Console.WriteLine(T($"  纹理数据总计: ", "  Total texture data: ") + FormatSize(totalDataSize));
                 }
             }
         }
@@ -373,9 +410,9 @@ namespace RePKG.Command
         private static string FormatSize(long bytes)
         {
             if (bytes < KB)
-                return $"{bytes} bytes";
+                return Program.EnglishMode ? $"{bytes} bytes" : $"{bytes} 字节";
             if (bytes < MB)
-                return $"{bytes / (double)KB:F1} KB ({bytes} bytes)";
+                return Program.EnglishMode ? $"{bytes / (double)KB:F1} KB ({bytes} bytes)" : $"{bytes / (double)KB:F1} KB ({bytes} 字节)";
             if (bytes < GB)
                 return $"{bytes / (double)MB:F2} MB ({bytes} bytes)";
             return $"{bytes / (double)GB:F2} GB ({bytes} bytes)";
@@ -397,28 +434,40 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("info", HelpText = "Dumps PKG/TEX info.")]
+    [Verb("info", HelpText = "查看 PKG/TEX 文件信息")]
     public class InfoOptions
     {
-        [Value(0, Required = true, HelpText = "Path to file which you want to get info about", MetaName = "Input file")]
+        [Value(0, Required = true, HelpText = "要查看信息的文件路径", MetaName = "Input file")]
         public string Input { get; set; }
 
-        [Option('s', "sort", HelpText = "Sort entries a-z", Default = false)]
-        public bool Sort { get; set; }
+        [Option('a', "all", Required = false, HelpText = "显示所有详细信息（完整 project.json + 条目列表）")]
+        public bool AllMode { get; set; }
 
-        [Option('b', "sortby", HelpText = "Sort by ... (available options: name, extension, size)", Default = "name")]
-        public string SortBy { get; set; }
-
-        [Option('t', "tex", HelpText = "Dump info about all tex files from specified directory")]
-        public bool TexDirectory { get; set; }
-
-        [Option('p', "projectinfo", HelpText = "Keys to dump from project.json (delimit using comma) (* for all)")]
-        public string ProjectInfo { get; set; }
-
-        [Option('e', "printentries", HelpText = "Print entries in packages")]
+        [Option('e', "printentries", HelpText = "列出包内所有文件条目")]
         public bool PrintEntries { get; set; }
 
-        [Option("title-filter", HelpText = "Title filter")]
+        [Option("tex-only", Required = false, HelpText = "仅显示纹理(TEX)条目（需配合 -e 使用）")]
+        public bool TexOnly { get; set; }
+
+        [Option("bin-only", Required = false, HelpText = "仅显示非纹理(BIN)条目（需配合 -e 使用）")]
+        public bool BinOnly { get; set; }
+
+        [Option('s', "sort", HelpText = "排序条目 (A-Z)", Default = false)]
+        public bool Sort { get; set; }
+
+        [Option('b', "sortby", HelpText = "排序依据: name, extension, size", Default = "name")]
+        public string SortBy { get; set; }
+
+        [Option('t', "tex", HelpText = "查看目录下所有 TEX 文件的信息")]
+        public bool TexDirectory { get; set; }
+
+        [Option('p', "projectinfo", HelpText = "显示 project.json 的指定字段 (逗号分隔, * 显示全部)")]
+        public string ProjectInfo { get; set; }
+
+        [Option("title-filter", HelpText = "按标题关键词过滤")]
         public string TitleFilter { get; set; }
+
+        [Option("english", Required = false, HelpText = "Display output in English")]
+        public bool English { get; set; }
     }
 }
