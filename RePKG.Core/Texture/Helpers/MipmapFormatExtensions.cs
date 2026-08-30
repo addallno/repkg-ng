@@ -9,7 +9,7 @@ namespace RePKG.Core.Texture
         /// </summary>
         public static bool IsImage(this MipmapFormat format)
         {
-            return (int) format >= 1000;
+            return (int) format >= 1000 && format != MipmapFormat.Mobile;
         }
         
         /// <summary>
@@ -18,7 +18,7 @@ namespace RePKG.Core.Texture
         public static bool IsRawFormat(this MipmapFormat format)
         {
             var formatId = (int) format;
-            return formatId >= 1 && formatId <= 3;
+            return formatId >= 1 && formatId <= 3 || format == MipmapFormat.Mobile;
         }
         
         /// <summary>
@@ -117,6 +117,8 @@ namespace RePKG.Core.Texture
                     return "raw";
                 case MipmapFormat.VideoMp4:
                     return "mp4";
+                case MipmapFormat.Mobile:
+                    return "png";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(format), format, null);
             }

@@ -177,6 +177,30 @@ namespace RePKG.Application.Texture
                         ? new Image<Rgba32>(width, height)
                         : Image.LoadPixelData<Rgba32>(bytes, width, height);
 
+                case MipmapFormat.Mobile:
+                    // Mobile format: 1 byte per pixel, RGB332 (3 bits R, 3 bits G, 2 bits B)
+                    var rgba = new Rgba32[width * height];
+                    if (bytes != null)
+                    {
+                        for (int i = 0; i < width * height && i < bytes.Length; i++)
+                        {
+                            byte b = bytes[i];
+                            // RGB332: RRR GGG BB
+                            int r = (b >> 5) & 0x07;
+                            int g = (b >> 2) & 0x07;
+                            int bb = b & 0x03;
+                            // 扩展到 8 位: 乘以 36 (255/7 ≈ 36.4)
+                            rgba[i] = new Rgba32(
+                                (byte)(r * 36),
+                                (byte)(g * 36),
+                                (byte)(bb * 85),
+                                255);
+                        }
+                    }
+                    var image = new Image<Rgba32>(width, height);
+                    image.CopyPixelDataTo(rgba);
+                    return image;
+
                 default:
                     throw new InvalidOperationException($"Mipmap format: {format} is not supported");
             }

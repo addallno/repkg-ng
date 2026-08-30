@@ -56,8 +56,11 @@ namespace RePKG.Command
                     case "RGBA8888": format = TexFormat.RGBA8888; break;
                     case "R8": format = TexFormat.R8; break;
                     case "RG88": format = TexFormat.RG88; break;
+                    case "MOBILE":
+                    case "MOB":
+                    case "RGB332": format = TexFormat.Mobile; break;
                     default:
-                        Console.WriteLine($"Unsupported format: {options.Format}. Supported: RGBA8888, R8, RG88");
+                        Console.WriteLine($"Unsupported format: {options.Format}. Supported: RGBA8888, R8, RG88, MOBILE/MOB/RGB332");
                         return;
                 }
             }

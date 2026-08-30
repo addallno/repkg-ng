@@ -219,5 +219,10 @@ namespace RePKG.Core.Texture
         /// RAW camera image (*.*)
         /// </summary>
         ImageRAW,
+
+        /// <summary>
+        /// Mobile format (1 byte per pixel, RGB332)
+        /// </summary>
+        Mobile = 1022,
     }
 }

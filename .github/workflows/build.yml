@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Publish
+      run: |
+        if [ "${{ matrix.arch }}" = "x64" ]; then
+          dotnet publish -c Release -r linux-x64 --self-contained
+        else
+          dotnet publish -c Release -r linux-arm64 --self-contained
+        fi
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: repkg-${{ matrix.arch }}
+        path: RePKG/bin/Release/net8.0/linux-${{ matrix.arch }}/publish/

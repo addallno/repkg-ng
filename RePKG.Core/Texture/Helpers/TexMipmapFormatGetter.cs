@@ -18,6 +18,8 @@ namespace RePKG.Core.Texture
             {
                 case TexFormat.RGBA8888:
                     return MipmapFormat.RGBA8888;
+                case TexFormat.Mobile:
+                    return MipmapFormat.Mobile;
                 case TexFormat.DXT5:
                     return MipmapFormat.CompressedDXT5;
                 case TexFormat.DXT3:

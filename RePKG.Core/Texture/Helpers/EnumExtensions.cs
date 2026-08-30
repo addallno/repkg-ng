@@ -8,6 +8,7 @@ namespace RePKG.Core.Texture
             switch (format)
             {
                 case TexFormat.RGBA8888:
+                case TexFormat.Mobile:
                 case TexFormat.DXT5:
                 case TexFormat.DXT3:
                 case TexFormat.DXT1:

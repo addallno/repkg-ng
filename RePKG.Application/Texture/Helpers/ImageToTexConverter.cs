@@ -195,6 +195,19 @@ namespace RePKG.Application.Texture.Helpers
                     }
                     return MipmapFormat.RG88;
 
+                case TexFormat.Mobile:
+                    // Mobile format: 1 byte per pixel, RGB332 (3 bits R, 3 bits G, 2 bits B)
+                    pixelData = new byte[width * height];
+                    for (int i = 0; i < width * height; i++)
+                    {
+                        // 将 8 位颜色量化到 RGB332
+                        int r = (pixels[i].R * 7 + 127) / 255;  // 3 bits: 0-7
+                        int g = (pixels[i].G * 7 + 127) / 255;  // 3 bits: 0-7
+                        int b = (pixels[i].B * 3 + 127) / 255;  // 2 bits: 0-3
+                        pixelData[i] = (byte)((r << 5) | (g << 2) | b);
+                    }
+                    return MipmapFormat.Mobile;
+
                 default:
                     throw new NotSupportedException($"TexFormat {format} not supported");
             }
