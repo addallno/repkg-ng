@@ -9,7 +9,7 @@ namespace RePKG.Core.Texture
         /// </summary>
         public static bool IsImage(this MipmapFormat format)
         {
-            return (int) format >= 1000 && format != MipmapFormat.Mobile;
+            return (int) format >= 1000;
         }
         
         /// <summary>

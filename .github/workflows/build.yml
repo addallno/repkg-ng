@@ -27,9 +27,9 @@ jobs:
     - name: Publish
       run: |
         if [ "${{ matrix.arch }}" = "x64" ]; then
-          dotnet publish -c Release -r linux-x64 --self-contained
+          dotnet publish -c Release -r linux-x64 -f net8.0 --self-contained
         else
-          dotnet publish -c Release -r linux-arm64 --self-contained
+          dotnet publish -c Release -r linux-arm64 -f net8.0 --self-contained
         fi
 
     - name: Upload artifact

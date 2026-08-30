@@ -223,6 +223,6 @@ namespace RePKG.Core.Texture
         /// <summary>
         /// Mobile format (1 byte per pixel, RGB332)
         /// </summary>
-        Mobile = 1022,
+        Mobile = 4,
     }
 }
