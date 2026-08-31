@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [ master, main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ master, main ]
 
@@ -21,16 +22,12 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Publish
+    - name: Publish single file
       run: |
-        if [ "${{ matrix.arch }}" = "x64" ]; then
-          dotnet publish RePKG/RePKG.csproj -c Release -r linux-x64 -f net8.0 --self-contained
-        else
-          dotnet publish RePKG/RePKG.csproj -c Release -r linux-arm64 -f net8.0 --self-contained
-        fi
+        dotnet publish RePKG/RePKG.csproj -c Release -r linux-${{ matrix.arch }} -f net8.0 --self-contained -p:PublishSingleFile=true -o artifacts/${{ matrix.arch }}
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: repkg-${{ matrix.arch }}
-        path: RePKG/bin/Release/net8.0/linux-${{ matrix.arch }}/publish/
+        path: artifacts/${{ matrix.arch }}/RePKG
