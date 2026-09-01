@@ -42,6 +42,11 @@ namespace RePKG.Application.Texture
                 var mipmap = readFunction(reader);
                 mipmap.Format = format;
 
+                if (texFormat == TexFormat.Mobile)
+                {
+                    mipmap.Width /= 4;
+                }
+
                 if (DecompressMipmapBytes)
                     _texMipmapDecompressor.DecompressMipmap(mipmap);
 

@@ -28,9 +28,11 @@ namespace RePKG.Application.Texture.Helpers
             byte[] pixelData;
             var mipmapFormat = GetPixelData(pixels, texWidth, texHeight, format, out pixelData);
 
+            var mipmapWidth = format == TexFormat.Mobile ? texWidth * 4 : texWidth;
+
             var mipmap = new TexMipmap
             {
-                Width = texWidth,
+                Width = mipmapWidth,
                 Height = texHeight,
                 Bytes = pixelData,
                 Format = mipmapFormat,
@@ -53,7 +55,7 @@ namespace RePKG.Application.Texture.Helpers
             {
                 Format = format,
                 Flags = TexFlags.None,
-                TextureWidth = texWidth,
+                TextureWidth = format == TexFormat.Mobile ? texWidth * 4 : texWidth,
                 TextureHeight = texHeight,
                 ImageWidth = image.Width,
                 ImageHeight = image.Height,
@@ -196,17 +198,8 @@ namespace RePKG.Application.Texture.Helpers
                     return MipmapFormat.RG88;
 
                 case TexFormat.Mobile:
-                    // Mobile format: 1 byte per pixel, RGB332 (3 bits R, 3 bits G, 2 bits B)
-                    pixelData = new byte[width * height];
-                    for (int i = 0; i < width * height; i++)
-                    {
-                        // 将 8 位颜色量化到 RGB332
-                        int r = (pixels[i].R * 7 + 127) / 255;  // 3 bits: 0-7
-                        int g = (pixels[i].G * 7 + 127) / 255;  // 3 bits: 0-7
-                        int b = (pixels[i].B * 3 + 127) / 255;  // 2 bits: 0-3
-                        pixelData[i] = (byte)((r << 5) | (g << 2) | b);
-                    }
-                    return MipmapFormat.Mobile;
+                    pixelData = PixelDataFromRgba32(pixels, width, height);
+                    return MipmapFormat.RGBA8888;
 
                 default:
                     throw new NotSupportedException($"TexFormat {format} not supported");

@@ -50,6 +50,13 @@ namespace RePKG.Application.Texture
                 throw new UnknownMagicException(nameof(TexReader), nameof(tex.Magic2), tex.Magic2);
 
             tex.Header = _texHeaderReader.ReadFrom(reader);
+
+            if (tex.Header.Format == TexFormat.Mobile)
+            {
+                tex.Header.TextureWidth /= 4;
+                tex.Header.ImageWidth /= 4;
+            }
+
             tex.ImagesContainer = _texImageContainerReader.ReadFrom(reader, tex.Header.Format);
 
             if (tex.IsGif)
