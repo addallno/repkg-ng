@@ -51,12 +51,6 @@ namespace RePKG.Application.Texture
 
             tex.Header = _texHeaderReader.ReadFrom(reader);
 
-            if (tex.Header.Format == TexFormat.Mobile)
-            {
-                tex.Header.TextureWidth /= 4;
-                tex.Header.ImageWidth /= 4;
-            }
-
             tex.ImagesContainer = _texImageContainerReader.ReadFrom(reader, tex.Header.Format);
 
             if (tex.IsGif)
