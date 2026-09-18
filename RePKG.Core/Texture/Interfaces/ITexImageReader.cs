@@ -7,6 +7,7 @@ namespace RePKG.Core.Texture
         ITexImage ReadFrom(
             BinaryReader reader,
             ITexImageContainer container,
-            TexFormat texFormat);
+            TexFormat texFormat,
+            PackageFormat packageFormat);
     }
 }

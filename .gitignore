@@ -7,3 +7,5 @@ Publish
 RePKG.Tests/Output/*
 RePKG.Tests/TestTextures/*
 RePKG.Tests/TestTexturesValidated/*
+test_data/
+test_output/

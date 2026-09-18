@@ -5,24 +5,34 @@ namespace RePKG.Core.Texture
     public static class MipmapFormatExtensions
     {
         /// <summary>
-        /// Checks if the mipmap format is an image format
+        /// 图片格式 (值 >= 1000)
         /// </summary>
         public static bool IsImage(this MipmapFormat format)
         {
             return (int) format >= 1000;
         }
-        
+
         /// <summary>
-        /// Checks if the mipmap format is an raw uncompressed format
+        /// 原始未压缩像素格式 (无需解码器，直接读取像素数据)
         /// </summary>
         public static bool IsRawFormat(this MipmapFormat format)
         {
-            var formatId = (int) format;
-            return formatId >= 1 && formatId <= 3 || format == MipmapFormat.Mobile;
+            switch (format)
+            {
+                case MipmapFormat.RGBA8888:
+                case MipmapFormat.R8:
+                case MipmapFormat.RG88:
+                case MipmapFormat.RGB565:
+                case MipmapFormat.RGB888:
+                case MipmapFormat.RGBA4444:
+                    return true;
+                default:
+                    return false;
+            }
         }
-        
+
         /// <summary>
-        /// Checks if the mipmap format is an raw compressed format
+        /// 压缩格式 (需要解码器解压为 RGBA8888)
         /// </summary>
         public static bool IsCompressed(this MipmapFormat format)
         {
@@ -31,17 +41,20 @@ namespace RePKG.Core.Texture
                 case MipmapFormat.CompressedDXT5:
                 case MipmapFormat.CompressedDXT3:
                 case MipmapFormat.CompressedDXT1:
+                case MipmapFormat.CompressedDXT1Alpha:
+                case MipmapFormat.CompressedETC2:
+                case MipmapFormat.CompressedBC7:
+                case MipmapFormat.CompressedBC4:
                     return true;
-                
                 default:
                     return false;
             }
         }
 
         /// <summary>
-        /// Returns file extension for an image format
+        /// 文件扩展名
         /// </summary>
-        /// <exception cref="ArgumentOutOfRangeException">When mipmap format isn't an image format'</exception>
+        /// <exception cref="ArgumentOutOfRangeException">格式无对应扩展名</exception>
         public static string GetFileExtension(this MipmapFormat format)
         {
             switch (format)
@@ -57,9 +70,8 @@ namespace RePKG.Core.Texture
                 case MipmapFormat.ImageKOALA:
                     return "koa";
                 case MipmapFormat.ImageLBM:
-                    return "lbm";
                 case MipmapFormat.ImageIFF:
-                    return "iff";
+                    return "lbm";
                 case MipmapFormat.ImageMNG:
                     return "mng";
                 case MipmapFormat.ImagePBM:
@@ -117,7 +129,14 @@ namespace RePKG.Core.Texture
                     return "raw";
                 case MipmapFormat.VideoMp4:
                     return "mp4";
-                case MipmapFormat.Mobile:
+                case MipmapFormat.RGBA8888:
+                case MipmapFormat.R8:
+                case MipmapFormat.RG88:
+                case MipmapFormat.RGB565:
+                case MipmapFormat.RGB888:
+                case MipmapFormat.RGBA4444:
+                case MipmapFormat.CompressedBC7:
+                case MipmapFormat.CompressedBC4:
                     return "png";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(format), format, null);

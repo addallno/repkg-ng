@@ -3,6 +3,7 @@ namespace RePKG.Core.Texture
     public interface ITexHeader
     {
         TexFormat Format { get; set; }
+        int RawFormat { get; set; }
         TexFlags Flags { get; set; }
         int TextureWidth { get; set; }
         int TextureHeight { get; set; }

@@ -33,7 +33,43 @@ namespace RePKG.Core.Texture
         /// Raw pixels compressed using DXT1
         /// </summary>
         CompressedDXT1,
-        
+
+        /// <summary>
+        /// DXT1 with explicit 1-bit alpha channel
+        /// </summary>
+        CompressedDXT1Alpha,
+
+        /// <summary>
+        /// ETC2 RGBA8 block-compressed (16 bytes/block, Android)
+        /// 来源: 反编译 libscenejni.so, GL_COMPRESSED_RGBA8_ETC2_EAC (0x9278)
+        /// </summary>
+        CompressedETC2,
+
+        /// <summary>
+        /// BC7 block-compressed (16 bytes/block, Android)
+        /// </summary>
+        CompressedBC7,
+
+        /// <summary>
+        /// BC4 single-channel block-compressed (8 bytes/block, Android)
+        /// </summary>
+        CompressedBC4,
+
+        /// <summary>
+        /// Raw pixels RGB565 (2 bytes per pixel, Android)
+        /// </summary>
+        RGB565,
+
+        /// <summary>
+        /// Raw pixels RGB888 (3 bytes per pixel, Android)
+        /// </summary>
+        RGB888,
+
+        /// <summary>
+        /// Raw pixels RGBA4444 (2 bytes per pixel, Android)
+        /// </summary>
+        RGBA4444,
+
         /// <summary>
         /// MP4 Video
         /// </summary>
@@ -220,9 +256,5 @@ namespace RePKG.Core.Texture
         /// </summary>
         ImageRAW,
 
-        /// <summary>
-        /// Mobile format (1 byte per pixel, RGB332)
-        /// </summary>
-        Mobile = 4,
     }
 }

@@ -511,40 +511,40 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("info", HelpText = "查看 PKG/TEX 文件信息")]
+    [Verb("info", HelpText = "查看PKG/TEX文件信息")]
     public class InfoOptions
     {
-        [Value(0, Required = true, HelpText = "要查看信息的文件路径", MetaName = "Input file")]
+        [Value(0, Required = true, HelpText = "输入文件路径", MetaName = "Input")]
         public string Input { get; set; }
 
-        [Option('a', "all", Required = false, HelpText = "显示所有详细信息（完整 project.json + 条目列表）")]
+        [Option('a', "all", Required = false, HelpText = "显示所有详细信息 (完整project.json + 条目列表)")]
         public bool AllMode { get; set; }
 
         [Option('e', "entries", HelpText = "列出包内所有文件条目")]
         public bool PrintEntries { get; set; }
 
-        [Option("tex-only", Required = false, HelpText = "仅显示纹理(TEX)条目（需配合 -e 使用）")]
+        [Option("tex-only", Required = false, HelpText = "仅显示纹理(TEX)条目 (需配合-e使用)")]
         public bool TexOnly { get; set; }
 
-        [Option("bin-only", Required = false, HelpText = "仅显示非纹理(BIN)条目（需配合 -e 使用）")]
+        [Option("bin-only", Required = false, HelpText = "仅显示非纹理(BIN)条目 (需配合-e使用)")]
         public bool BinOnly { get; set; }
 
-        [Option('s', "sort", HelpText = "排序条目 (A-Z)", Default = false)]
+        [Option('s', "sort", HelpText = "对条目按名称排序 (A-Z)", Default = false)]
         public bool Sort { get; set; }
 
         [Option('b', "sortby", HelpText = "排序依据: name, extension, size", Default = "name")]
         public string SortBy { get; set; }
 
-        [Option('t', "tex", HelpText = "查看目录下所有 TEX 文件的信息")]
+        [Option('t', "tex", HelpText = "查看目录下所有.tex文件的信息")]
         public bool TexDirectory { get; set; }
 
-        [Option('p', "projectinfo", HelpText = "显示 project.json 的指定字段 (逗号分隔, * 显示全部)")]
+        [Option('p', "projectinfo", HelpText = "显示project.json的指定字段 (逗号分隔, *显示全部)")]
         public string ProjectInfo { get; set; }
 
         [Option("title-filter", HelpText = "按标题关键词过滤")]
         public string TitleFilter { get; set; }
 
-        [Option("only", Required = false, HelpText = "仅显示指定字段: title,author,count,magic,entries,type,tags (逗号分隔)")]
+        [Option("only", Required = false, HelpText = "仅显示指定字段 (逗号分隔): title,author,count,magic,entries,type,tags")]
         public string OnlyFields { get; set; }
 
         [Option("en", Required = false, HelpText = "Display output in English")]

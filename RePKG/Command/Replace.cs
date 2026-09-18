@@ -17,6 +17,8 @@ namespace RePKG.Command
 {
     public static class Replace
     {
+        private static string T(string zh, string en) => Program.EnglishMode ? en : zh;
+
         private static readonly IPackageReader _packageReader;
         private static readonly IPackageWriter _packageWriter;
         private static readonly ITexReader _texReader;
@@ -50,12 +52,14 @@ namespace RePKG.Command
 
             if (pkgPaths.Count == 0 || pkgPaths.Count != filePaths.Count)
             {
-                Console.WriteLine($"Mismatch: {pkgPaths.Count} inside paths (-r) but {filePaths.Count} files (-f)");
-                Console.WriteLine("Usage: repkg replace <pkg> -r <inside path> -f <file> [-o <output>]");
+                Console.WriteLine(T($"不匹配: 包内路径(-t)有 {pkgPaths.Count} 个, 但替换文件(-f)有 {filePaths.Count} 个",
+                    $"Mismatch: {pkgPaths.Count} inside paths (-t) but {filePaths.Count} files (-f)"));
+                Console.WriteLine(T("用法: repkg replace <pkg> -t <包内路径> -f <替换文件> [-o <输出>]",
+                    "Usage: repkg replace <pkg> -t <inside path> -f <file> [-o <output>]"));
                 return;
             }
 
-            Console.WriteLine($"Reading: {inputPath}");
+            Console.WriteLine($"{T("正在读取: ", "Reading: ")}{inputPath}");
 
             Package package;
             using (var reader = new BinaryReader(File.OpenRead(inputPath)))
@@ -63,7 +67,7 @@ namespace RePKG.Command
                 package = _packageReader.ReadFrom(reader);
             }
 
-            Console.WriteLine($"Entries: {package.Entries.Count}, Magic: {package.Magic}");
+            Console.WriteLine($"{T("条目数: ", "Entries: ")}{package.Entries.Count}, {T("魔术字: ", "Magic: ")}{package.Magic}");
 
             for (int i = 0; i < pkgPaths.Count; i++)
             {
@@ -76,8 +80,8 @@ namespace RePKG.Command
 
                 if (entry == null)
                 {
-                    Console.WriteLine($"Entry not found in package: {pkgPaths[i]}");
-                    Console.WriteLine("Available entries:");
+                    Console.WriteLine(T("包中未找到条目: ", "Entry not found in package: ") + pkgPaths[i]);
+                    Console.WriteLine(T("可用条目:", "Available entries:"));
                     foreach (var e in package.Entries)
                         Console.WriteLine($"  {e.FullPath}");
                     return;
@@ -85,7 +89,7 @@ namespace RePKG.Command
 
                 if (!File.Exists(filePath))
                 {
-                    Console.WriteLine($"Replacement file not found: {filePath}");
+                    Console.WriteLine(T("替换文件未找到: ", "Replacement file not found: ") + filePath);
                     return;
                 }
 
@@ -96,12 +100,12 @@ namespace RePKG.Command
                     var useLz4 = !options.NoLz4;
                     if (options.ForceConvert && Path.GetExtension(filePath) == ".tex")
                     {
-                        Console.WriteLine($"Re-encoding: {filePath} -> TEX");
+                        Console.WriteLine($"{T("正在重编码: ", "Re-encoding: ")}{filePath} -> TEX");
                         newBytes = ReencodeTexFile(filePath, useLz4);
                     }
                     else
                     {
-                        Console.WriteLine($"Converting: {filePath} -> TEX");
+                        Console.WriteLine($"{T("正在转换: ", "Converting: ")}{filePath} -> TEX");
                         newBytes = ConvertToTexBytes(filePath, options.VideoWidth, options.VideoHeight, useLz4);
                     }
                 }
@@ -114,7 +118,7 @@ namespace RePKG.Command
                 entry.Type = PackageEntryTypeGetter.GetFromFileName(entry.FullPath);
                 entry.Length = newBytes.Length;
 
-                Console.WriteLine($"Replaced: {entry.FullPath} ({newBytes.Length} bytes)");
+                Console.WriteLine($"{T("已替换: ", "Replaced: ")}{entry.FullPath} ({newBytes.Length} bytes)");
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)));
@@ -124,8 +128,8 @@ namespace RePKG.Command
                 _packageWriter.WriteTo(writer, package);
             }
 
-            Console.WriteLine($"Package written: {outputPath}");
-            Console.WriteLine($"Entries: {package.Entries.Count}, Magic: {package.Magic}");
+            Console.WriteLine($"{T("已输出包: ", "Package written: ")}{outputPath}");
+            Console.WriteLine($"{T("条目数: ", "Entries: ")}{package.Entries.Count}, {T("魔术字: ", "Magic: ")}{package.Magic}");
         }
 
         private static readonly HashSet<string> ImageExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -290,34 +294,34 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("replace", HelpText = "替换 PKG/MPKG 内部文件，无需完整解包/打包")]
+    [Verb("replace", HelpText = "替换PKG/MPKG内部文件,无需完整解包/打包")]
     public class ReplaceOptions
     {
-        [Option('o', "output", Required = false, HelpText = "输出 PKG/MPKG 路径（默认: input.replaced.pkg）")]
+        [Option('o', "output", Required = false, HelpText = "输出PKG/MPKG路径 (默认: input.replaced.pkg)")]
         public string Output { get; set; }
 
-        [Option('r', "replace", Required = true, HelpText = "包内文件路径（可多次指定）", Min = 1)]
+        [Option('t', "target", Required = true, HelpText = "包内文件路径 (可多次指定, 与-f按顺序配对). 例: -t materials/hero.tex -f ./hero_new.png", Min = 1)]
         public IEnumerable<string> Replacements { get; set; }
 
-        [Option('f', "file", Required = true, HelpText = "本地替换文件路径（与 -r 按顺序配对）", Min = 1)]
+        [Option('f', "file", Required = true, HelpText = "本地替换文件路径 (与-t按顺序配对)", Min = 1)]
         public IEnumerable<string> Files { get; set; }
 
-        [Option('F', "force", Required = false, HelpText = "强制重编码：即使替换 .tex 也重新编码")]
+        [Option('F', "force", Required = false, HelpText = "强制重编码: 即使替换.tex也重新编码")]
         public bool ForceConvert { get; set; }
 
-        [Option("no-lz4", Required = false, HelpText = "禁用 LZ4 mipmap 压缩（默认启用）")]
+        [Option("no-lz4", Required = false, HelpText = "禁用mipmap数据的LZ4压缩 (默认启用)")]
         public bool NoLz4 { get; set; }
 
-        [Option("video-width", Required = false, HelpText = "视频宽度（像素），省略时自动检测")]
+        [Option("video-width", Required = false, HelpText = "视频纹理的宽度 (像素), 省略时自动检测")]
         public int VideoWidth { get; set; }
 
-        [Option("video-height", Required = false, HelpText = "视频高度（像素），省略时自动检测")]
+        [Option("video-height", Required = false, HelpText = "视频纹理的高度 (像素), 省略时自动检测")]
         public int VideoHeight { get; set; }
 
         [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
-        [Value(0, Required = true, HelpText = "输入 PKG/MPKG 文件路径", MetaName = "Input")]
+        [Value(0, Required = true, HelpText = "输入PKG/MPKG文件路径", MetaName = "Input")]
         public string Input { get; set; }
     }
 }

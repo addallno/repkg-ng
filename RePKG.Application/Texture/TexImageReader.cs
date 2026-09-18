@@ -19,24 +19,26 @@ namespace RePKG.Application.Texture
         public ITexImage ReadFrom(
             BinaryReader reader,
             ITexImageContainer container,
-            TexFormat texFormat)
+            TexFormat texFormat,
+            PackageFormat packageFormat = PackageFormat.V)
         {
             if (reader == null) throw new ArgumentNullException(nameof(reader));
             if (container == null) throw new ArgumentNullException(nameof(container));
-            
-            if (!texFormat.IsValid())
-                throw new EnumNotValidException<TexFormat>(texFormat);
 
             var mipmapCount = reader.ReadInt32();
-            
+
             if (mipmapCount > Constants.MaximumMipmapCount)
                 throw new UnsafeTexException(
                     $"Mipmap count exceeds limit: {mipmapCount}/{Constants.MaximumMipmapCount}");
-            
+
             var readFunction = PickMipmapReader(container.ImageContainerVersion);
-            var format = TexMipmapFormatGetter.GetFormatForTex(container.ImageFormat, texFormat);
+
+            // 使用 TexFormatMapper 根据 PackageFormat 选择正确的格式映射
+            var rawFormat = (int)texFormat;
+            var format = TexFormatMapper.Map(rawFormat, packageFormat);
+
             var image = new TexImage();
-            
+
             for (var i = 0; i < mipmapCount; i++)
             {
                 var mipmap = readFunction(reader);
@@ -74,26 +76,22 @@ namespace RePKG.Application.Texture
         }
         private TexMipmap ReadMipmapV4(BinaryReader reader)
         {
-            /**FIXME
-             * The role of the following param* parameters cannot be confirmed, 
-             * it may be a parameter used in the built-in display of the wallpaper editor and does not need to be processed
-             */
             var param1 = reader.ReadInt32();
             if(param1 != 1)
             {
-                throw new UnsafeTexException($"ReadMipmapV4 unknow param1 :{param1}");
+                throw new UnsafeTexException($"ReadMipmapV4 unknown param1: {param1}");
             }
             var param2= reader.ReadInt32();
             if (param2 != 2)
             {
-                throw new UnsafeTexException($"ReadMipmapV4 unknow param2 :{param2}");
+                throw new UnsafeTexException($"ReadMipmapV4 unknown param2: {param2}");
             }
             var conditionJson = reader.ReadNString();
-            
+
             var param3 = reader.ReadInt32();
             if (param3 != 1)
             {
-                throw new UnsafeTexException($"ReadMipmapV4 unknow param3 :{param3}");
+                throw new UnsafeTexException($"ReadMipmapV4 unknown param3: {param3}");
             }
             return new TexMipmap
             {
@@ -107,7 +105,7 @@ namespace RePKG.Application.Texture
         private byte[] ReadBytes(BinaryReader reader)
         {
             var byteCount = reader.ReadInt32();
-            
+
             if (reader.BaseStream.Position + byteCount > reader.BaseStream.Length)
                 throw new UnsafeTexException("Detected invalid mipmap byte count - exceeds stream length");
 
@@ -140,7 +138,7 @@ namespace RePKG.Application.Texture
                 case TexImageContainerVersion.Version2:
                 case TexImageContainerVersion.Version3:
                     return ReadMipmapV2And3;
-                    
+
                 case TexImageContainerVersion.Version4:
                     return ReadMipmapV4;
                 default:

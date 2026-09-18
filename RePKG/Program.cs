@@ -20,11 +20,11 @@ namespace RePKG
             }
 
             Parser.Default.ParseArguments<
-                ExtractOptions, InfoOptions, PackOptions,
+                ExtractOptions, InfoOptions, RepackOptions,
                 ReplaceOptions, ConvertOptions>(args)
                 .WithParsed<ExtractOptions>(Extract.Action)
                 .WithParsed<InfoOptions>(Info.Action)
-                .WithParsed<PackOptions>(Pack.Action)
+                .WithParsed<RepackOptions>(Repack.Action)
                 .WithParsed<ReplaceOptions>(Replace.Action)
                 .WithParsed<ConvertOptions>(RePKG.Command.Convert.Action);
         }
@@ -48,11 +48,11 @@ namespace RePKG
                 var interactiveArgs = line.SplitArguments();
 
                 Parser.Default.ParseArguments<
-                    ExtractOptions, InfoOptions, PackOptions,
+                    ExtractOptions, InfoOptions, RepackOptions,
                     ReplaceOptions, ConvertOptions>(interactiveArgs)
                     .WithParsed<ExtractOptions>(Extract.Action)
                     .WithParsed<InfoOptions>(Info.Action)
-                    .WithParsed<PackOptions>(Pack.Action)
+                    .WithParsed<RepackOptions>(Repack.Action)
                     .WithParsed<ReplaceOptions>(Replace.Action)
                 .WithParsed<ConvertOptions>(RePKG.Command.Convert.Action);
             }

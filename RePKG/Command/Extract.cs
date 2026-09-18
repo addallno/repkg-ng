@@ -17,6 +17,8 @@ namespace RePKG.Command
 {
     public static class Extract
     {
+        private static string T(string zh, string en) => Program.EnglishMode ? en : zh;
+
         private static ExtractOptions _options;
         private static string[] _skipExtArray;
         private static string[] _onlyExtArray;
@@ -64,17 +66,17 @@ namespace RePKG.Command
                     else
                         ExtractPkgDirectory(directoryInfo);
 
-                    Console.WriteLine("Done");
+                    Console.WriteLine(T("完成", "Done"));
                     return;
                 }
 
-                Console.WriteLine("Input file not found");
+                Console.WriteLine(T("输入文件未找到", "Input file not found"));
                 Console.WriteLine(options.Input);
                 return;
             }
 
             ExtractFile(fileInfo);
-            Console.WriteLine("Done");
+            Console.WriteLine(T("完成", "Done"));
         }
 
         private static string[] NormalizeExtensions(string[] array)
@@ -98,6 +100,8 @@ namespace RePKG.Command
 
             Directory.CreateDirectory(_options.OutputDirectory);
 
+            var pkgFormat = _options.Mobile ? PackageFormat.M : PackageFormat.V;
+
             foreach (var fileInfo in directoryInfo.EnumerateFiles("*.tex", flags))
             {
                 if (!fileInfo.Extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
@@ -105,7 +109,7 @@ namespace RePKG.Command
 
                 try
                 {
-                    var tex = LoadTex(File.ReadAllBytes(fileInfo.FullName), fileInfo.FullName);
+                    var tex = LoadTex(File.ReadAllBytes(fileInfo.FullName), fileInfo.FullName, pkgFormat);
 
                     if (tex == null)
                         continue;
@@ -119,7 +123,7 @@ namespace RePKG.Command
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Failed to write texture");
+                    Console.WriteLine(T("写入纹理失败", "Failed to write texture"));
                     Console.WriteLine(e);
                 }
             }
@@ -162,7 +166,8 @@ namespace RePKG.Command
                 ExtractPkg(fileInfo);
             else if (fileInfo.Extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
             {
-                var tex = LoadTex(File.ReadAllBytes(fileInfo.FullName), fileInfo.FullName);
+                var pkgFormat = _options.Mobile ? PackageFormat.M : PackageFormat.V;
+                var tex = LoadTex(File.ReadAllBytes(fileInfo.FullName), fileInfo.FullName, pkgFormat);
 
                 if (tex == null)
                     return;
@@ -182,12 +187,12 @@ namespace RePKG.Command
                 }
             }
             else
-                Console.WriteLine($"Unrecognized file extension: {fileInfo.Extension}");
+                Console.WriteLine(T("不支持的文件扩展名: ", "Unrecognized file extension: ") + fileInfo.Extension);
         }
 
         private static void ExtractPkg(FileInfo file, bool appendFolderName = false, string defaultProjectName = "")
         {
-            Console.WriteLine($"\r\n### Extracting package: {file.FullName}");
+            Console.WriteLine($"\r\n### {T("正在解包: ", "Extracting package: ")}{file.FullName}");
 
             // Load package
             Package package;
@@ -196,6 +201,9 @@ namespace RePKG.Command
             {
                 package = _packageReader.ReadFrom(reader);
             }
+
+            var packageFormat = GetPackageFormat(package);
+            Console.WriteLine($"* {T("包格式: ", "Package format: ")}{packageFormat} ({T("魔术字", "magic")}: {package.Magic})");
 
             // Get output directory
             string outputDirectory;
@@ -209,7 +217,7 @@ namespace RePKG.Command
             var entries = FilterEntries(package.Entries);
             foreach (var entry in entries)
             {
-                ExtractEntry(entry, ref outputDirectory);
+                ExtractEntry(entry, ref outputDirectory, packageFormat);
             }
 
             // Copy project files project.json/preview image
@@ -230,11 +238,11 @@ namespace RePKG.Command
                 var outputPath = Path.Combine(outputDirectory, file.Name);
 
                 if (!_options.Overwrite && File.Exists(outputPath))
-                    Console.WriteLine($"* Skipping, already exists: {outputPath}");
+                    Console.WriteLine($"* {T("跳过, 已存在: ", "Skipping, already exists: ")}{outputPath}");
                 else
                 {
                     File.Copy(file.FullName, outputPath, true);
-                    Console.WriteLine($"* Copying: {file.FullName}");
+                    Console.WriteLine($"* {T("复制: ", "Copying: ")}{file.FullName}");
                 }
             }
         }
@@ -265,7 +273,8 @@ namespace RePKG.Command
         }
 
         [SuppressMessage("ReSharper", "AssignNullToNotNullAttribute")]
-        private static void ExtractEntry(PackageEntry entry, ref string outputDirectory)
+        private static void ExtractEntry(PackageEntry entry, ref string outputDirectory,
+            PackageFormat packageFormat = PackageFormat.V)
         {
             if (Program.Closing)
                 Environment.Exit(0);
@@ -280,10 +289,10 @@ namespace RePKG.Command
             Directory.CreateDirectory(Path.GetDirectoryName(filePathWithoutExtension));
 
             if (!_options.Overwrite && File.Exists(filePath))
-                Console.WriteLine($"* Skipping, already exists: {filePath}");
+                Console.WriteLine($"* {T("跳过, 已存在: ", "Skipping, already exists: ")}{filePath}");
             else
             {
-                Console.WriteLine($"* Extracting: {entry.FullPath}");
+                Console.WriteLine($"* {T("正在提取: ", "Extracting: ")}{entry.FullPath}");
 
                 File.WriteAllBytes(filePath, entry.Bytes);
             }
@@ -292,7 +301,7 @@ namespace RePKG.Command
             if (_options.NoTexConvert || entry.Type != EntryType.Tex)
                 return;
 
-            var tex = LoadTex(entry.Bytes, entry.FullPath);
+            var tex = LoadTex(entry.Bytes, entry.FullPath, packageFormat);
 
             if (tex == null)
                 return;
@@ -305,7 +314,7 @@ namespace RePKG.Command
             }
             catch (Exception e)
             {
-                Console.WriteLine("Failed to write texture");
+                Console.WriteLine(T("写入纹理失败", "Failed to write texture"));
                 Console.WriteLine(e);
             }
         }
@@ -347,27 +356,37 @@ namespace RePKG.Command
             outputDirectory = Path.Combine(_options.OutputDirectory, defaultProjectName);
         }
 
-        private static ITex LoadTex(byte[] bytes, string name)
+        private static ITex LoadTex(byte[] bytes, string name, PackageFormat? packageFormat = null)
         {
             if (Program.Closing)
                 Environment.Exit(0);
 
-            Console.WriteLine("* Reading: {0}", name);
+            Console.WriteLine(T("* 正在读取: ", "* Reading: ") + name);
 
             try
             {
                 using (var reader = new BinaryReader(new MemoryStream(bytes), Encoding.UTF8))
                 {
-                    return _texReader.ReadFrom(reader);
+                    if (packageFormat.HasValue)
+                        return _texReader.ReadFrom(reader, packageFormat.Value);
+                    else
+                        return _texReader.ReadFrom(reader);
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("Failed to read texture");
+                Console.WriteLine(T("读取纹理失败", "Failed to read texture"));
                 Console.WriteLine(e);
             }
 
             return null;
+        }
+
+        private static PackageFormat GetPackageFormat(Package package)
+        {
+            if (package.Magic != null && package.Magic.StartsWith("PKGM"))
+                return PackageFormat.M;
+            return PackageFormat.V;
         }
         
         private static void ConvertToImageAndSave(ITex tex, string path, bool overwrite)
@@ -384,46 +403,49 @@ namespace RePKG.Command
         }
     }
 
-    [Verb("extract", HelpText = "解包 PKG/MPKG 文件，或将 TEX 纹理转换为图片")]
+    [Verb("extract", HelpText = "解包PKG/MPKG文件,或转换TEX纹理为图片")]
     public class ExtractOptions
     {
-        [Option('o', "output", Required = false, HelpText = "输出目录", Default = "./output")]
+        [Option('o', "output", Required = false, HelpText = "输出目录路径 (默认: ./output)", Default = "./output")]
         public string OutputDirectory { get; set; }
 
-        [Option('i', "ignoreexts", HelpText = "排除指定扩展名的文件（多个用逗号分隔）")]
+        [Option('i', "ignoreexts", HelpText = "排除指定扩展名的文件 (逗号分隔, 例: -i json,mp4)")]
         public string IgnoreExts { get; set; }
 
-        [Option('e', "onlyexts", HelpText = "只提取指定扩展名的文件（多个用逗号分隔）")]
+        [Option('e', "onlyexts", HelpText = "只提取指定扩展名的文件 (逗号分隔, 例: -e tex,json)")]
         public string OnlyExts { get; set; }
 
-        [Option('t', "tex", HelpText = "将目录下所有 TEX 文件转换为图片")]
+        [Option('t', "tex", HelpText = "将目录下所有.tex文件转换为PNG图片")]
         public bool TexDirectory { get; set; }
 
-        [Option('s', "singledir", HelpText = "将所有文件提取到单一目录而不是保持目录结构")]
+        [Option('s', "singledir", HelpText = "将所有文件提取到单一目录 (不保持目录结构)")]
         public bool SingleDir { get; set; }
 
         [Option('r', "recursive", HelpText = "递归搜索指定目录下的所有子目录")]
         public bool Recursive { get; set; }
 
-        [Option('c', "copyproject", HelpText = "从 PKG 所在目录复制 project.json 和预览图到输出目录")]
+        [Option('c', "copyproject", HelpText = "从PKG所在目录复制project.json和预览图到输出目录")]
         public bool CopyProject { get; set; }
 
-        [Option('n', "usename", HelpText = "使用 project.json 中的名称作为项目子目录名")]
+        [Option('n', "usename", HelpText = "使用project.json中的名称作为项目子目录名")]
         public bool UseName { get; set; }
 
-        [Option('T', "no-tex", HelpText = "跳过所有 .tex 条目（只提取非纹理文件）")]
+        [Option('T', "no-tex", HelpText = "跳过所有.tex条目 (只提取非纹理文件)")]
         public bool NoTex { get; set; }
 
-        [Option("no-tex-convert", HelpText = "提取 PKG 时不将 TEX 文件转换为图片")]
+        [Option("no-tex-convert", HelpText = "提取PKG时不将TEX文件转换为图片")]
         public bool NoTexConvert { get; set; }
 
         [Option("overwrite", HelpText = "覆盖所有已存在的文件")]
         public bool Overwrite { get; set; }
 
+        [Option('M', "mpkg", HelpText = "为.tex文件使用Android MPKG格式映射 (默认为桌面版PKG)")]
+        public bool Mobile { get; set; }
+
         [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
-        [Value(0, Required = true, HelpText = "Path to file/directory", MetaName = "Input")]
+        [Value(0, Required = true, HelpText = "输入文件或目录路径", MetaName = "Input")]
         public string Input { get; set; }
     }
 }

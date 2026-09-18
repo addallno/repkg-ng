@@ -14,12 +14,10 @@ namespace RePKG.Application.Texture
             _texImageReader = texImageReader;
         }
 
-        public ITexImageContainer ReadFrom(BinaryReader reader, TexFormat texFormat)
+        public ITexImageContainer ReadFrom(BinaryReader reader, TexFormat texFormat,
+            PackageFormat packageFormat = PackageFormat.V)
         {
             if (reader == null) throw new ArgumentNullException(nameof(reader));
-
-            if (!texFormat.IsValid())
-                throw new EnumNotValidException<TexFormat>(texFormat);
 
             var container = new TexImageContainer
             {
@@ -64,13 +62,13 @@ namespace RePKG.Application.Texture
             {
                 container.ImageContainerVersion = TexImageContainerVersion.Version3;
             }
-            
+
             if (!container.ImageFormat.IsValid())
                 throw new EnumNotValidException<FreeImageFormat>(container.ImageFormat);
 
             for (var i = 0; i < imageCount; i++)
             {
-                container.Images.Add(_texImageReader.ReadFrom(reader, container, texFormat));
+                container.Images.Add(_texImageReader.ReadFrom(reader, container, texFormat, packageFormat));
             }
 
             return container;

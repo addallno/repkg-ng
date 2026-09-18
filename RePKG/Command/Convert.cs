@@ -10,6 +10,8 @@ namespace RePKG.Command
 {
     public static class Convert
     {
+        private static string T(string zh, string en) => Program.EnglishMode ? en : zh;
+
         private static readonly IPackageReader _packageReader;
         private static readonly IPackageWriter _packageWriter;
 
@@ -49,8 +51,8 @@ namespace RePKG.Command
                     targetMagic = inputExt == ".mpkg" ? "PKGV0005" : "PKGM0019";
             }
 
-            Console.WriteLine($"读取: {inputPath}");
-            Console.WriteLine($"目标魔术字: {targetMagic}");
+            Console.WriteLine($"{T("正在读取: ", "Reading: ")}{inputPath}");
+            Console.WriteLine($"{T("目标魔术字: ", "Target magic: ")}{targetMagic}");
 
             Package package;
             using (var reader = new BinaryReader(File.OpenRead(inputPath)))
@@ -58,7 +60,7 @@ namespace RePKG.Command
                 package = _packageReader.ReadFrom(reader);
             }
 
-            Console.WriteLine($"条目数: {package.Entries.Count}, 原魔术字: {package.Magic}");
+            Console.WriteLine($"{T("条目数: ", "Entries: ")}{package.Entries.Count}, {T("原魔术字: ", "Original magic: ")}{package.Magic}");
 
             package.Magic = targetMagic;
 
@@ -69,12 +71,12 @@ namespace RePKG.Command
                 _packageWriter.WriteTo(writer, package);
             }
 
-            Console.WriteLine($"已输出: {outputPath}");
-            Console.WriteLine($"条目数: {package.Entries.Count}, 魔术字: {targetMagic}");
+            Console.WriteLine($"{T("已输出: ", "Output written: ")}{outputPath}");
+            Console.WriteLine($"{T("条目数: ", "Entries: ")}{package.Entries.Count}, {T("魔术字: ", "Magic: ")}{targetMagic}");
         }
     }
 
-    [Verb("convert", HelpText = "转换 PKG/MPKG 格式 (桌面 ←→ Android)")]
+    [Verb("convert", HelpText = "转换PKG/MPKG格式 (桌面版 <-> Android版)")]
     public class ConvertOptions
     {
         [Option('o', "output", Required = false, HelpText = "输出路径 (默认: input.converted.pkg/.mpkg)")]
@@ -83,16 +85,16 @@ namespace RePKG.Command
         [Option('m', "magic", Required = false, HelpText = "强制指定魔术字 (PKGV0005 / PKGM0019)")]
         public string Magic { get; set; }
 
-        [Option("android", Required = false, HelpText = "转换为 Android MPKG 格式 (PKGM0019)")]
+        [Option('M', "android", Required = false, HelpText = "转换为Android MPKG格式 (PKGM0019)")]
         public bool Android { get; set; }
 
-        [Option("desktop", Required = false, HelpText = "转换为桌面 PKG 格式 (PKGV0005)")]
+        [Option('V', "desktop", Required = false, HelpText = "转换为桌面PKG格式 (PKGV0005)")]
         public bool Desktop { get; set; }
 
         [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }
 
-        [Value(0, Required = true, HelpText = "输入 PKG/MPKG 文件路径", MetaName = "Input")]
+        [Value(0, Required = true, HelpText = "输入PKG/MPKG文件路径", MetaName = "Input")]
         public string Input { get; set; }
     }
 }

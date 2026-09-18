@@ -1,6 +1,5 @@
 using System;
 using K4os.Compression.LZ4;
-using RePKG.Application.Texture.Helpers;
 using RePKG.Core.Texture;
 
 namespace RePKG.Application.Texture
@@ -20,20 +19,12 @@ namespace RePKG.Application.Texture
             if (mipmap.Format.IsImage())
                 return;
 
-            switch (mipmap.Format)
+            // 压缩格式和需要像素转换的原始格式都由 TextureDecoder 统一处理
+            if (mipmap.Format.IsCompressed() || mipmap.Format != MipmapFormat.RGBA8888)
             {
-                case MipmapFormat.CompressedDXT5:
-                    mipmap.Bytes = DXT.DecompressImage(mipmap.Width, mipmap.Height, mipmap.Bytes, DXTFlags.DXT5);
-                    mipmap.Format = MipmapFormat.RGBA8888;
-                    break;
-                case MipmapFormat.CompressedDXT3:
-                    mipmap.Bytes = DXT.DecompressImage(mipmap.Width, mipmap.Height, mipmap.Bytes, DXTFlags.DXT3);
-                    mipmap.Format = MipmapFormat.RGBA8888;
-                    break;
-                case MipmapFormat.CompressedDXT1:
-                    mipmap.Bytes = DXT.DecompressImage(mipmap.Width, mipmap.Height, mipmap.Bytes, DXTFlags.DXT1);
-                    mipmap.Format = MipmapFormat.RGBA8888;
-                    break;
+                mipmap.Bytes = TextureDecoder.Decode(mipmap.Width, mipmap.Height,
+                    mipmap.Bytes, mipmap.Format);
+                mipmap.Format = MipmapFormat.RGBA8888;
             }
         }
 
