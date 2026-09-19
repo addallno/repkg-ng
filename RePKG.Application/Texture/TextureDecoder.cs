@@ -998,6 +998,36 @@ namespace RePKG.Application.Texture
                     return out8;
                 }
 
+                case Core.Texture.MipmapFormat.R8:
+                {
+                    var out8 = AllocateRgbaBuffer(width, height);
+                    int count = width * height;
+                    int maxRead = data.Length;
+                    for (int i = 0, si = 0, di = 0; i < count && si < maxRead; i++, si++, di += 4)
+                    {
+                        out8[di] = data[si];
+                        out8[di + 1] = data[si];
+                        out8[di + 2] = data[si];
+                        out8[di + 3] = 255;
+                    }
+                    return out8;
+                }
+
+                case Core.Texture.MipmapFormat.RG88:
+                {
+                    var out8 = AllocateRgbaBuffer(width, height);
+                    int count = width * height;
+                    int maxRead = data.Length;
+                    for (int i = 0, si = 0, di = 0; i < count && si + 1 < maxRead; i++, si += 2, di += 4)
+                    {
+                        out8[di] = data[si];
+                        out8[di + 1] = data[si + 1];
+                        out8[di + 2] = 0;
+                        out8[di + 3] = 255;
+                    }
+                    return out8;
+                }
+
                 case Core.Texture.MipmapFormat.CompressedDXT1:
                 case Core.Texture.MipmapFormat.CompressedDXT1Alpha:
                 {
