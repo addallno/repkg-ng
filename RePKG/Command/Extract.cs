@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using CommandLine;
 using Newtonsoft.Json;
 using RePKG.Application.Package;
@@ -23,6 +25,7 @@ namespace RePKG.Command
         private static string[] _skipExtArray;
         private static string[] _onlyExtArray;
         private static readonly string[] ProjectFiles = {"project.json"};
+        private static readonly object ConsoleLock = new object();
 
         private static readonly ITexReader _texReader;
         private static readonly ITexJsonInfoGenerator _texJsonInfoGenerator;
@@ -102,17 +105,23 @@ namespace RePKG.Command
 
             var pkgFormat = _options.Mobile ? PackageFormat.M : PackageFormat.V;
 
-            foreach (var fileInfo in directoryInfo.EnumerateFiles("*.tex", flags))
-            {
-                if (!fileInfo.Extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
-                    continue;
+            var texFiles = directoryInfo.EnumerateFiles("*.tex", flags)
+                .Where(f => f.Extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
+            var parallelOptions = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = _options.Parallel > 0 ? _options.Parallel : Environment.ProcessorCount
+            };
+
+            Parallel.ForEach(texFiles, parallelOptions, fileInfo =>
+            {
                 try
                 {
                     var tex = LoadTex(File.ReadAllBytes(fileInfo.FullName), fileInfo.FullName, pkgFormat);
 
                     if (tex == null)
-                        continue;
+                        return;
 
                     var filePath = Path.Combine(_options.OutputDirectory,
                         Path.GetFileNameWithoutExtension(fileInfo.Name));
@@ -132,10 +141,13 @@ namespace RePKG.Command
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(T("写入纹理失败", "Failed to write texture"));
-                    Console.WriteLine(e);
+                    lock (ConsoleLock)
+                    {
+                        Console.WriteLine(T("写入纹理失败", "Failed to write texture"));
+                        Console.WriteLine(e);
+                    }
                 }
-            }
+            });
         }
 
         private static void ExtractPkgDirectory(DirectoryInfo directoryInfo)
@@ -237,12 +249,16 @@ namespace RePKG.Command
             else
                 outputDirectory = _options.OutputDirectory;
 
-            // Extract package entries
+            // 提取包条目（并行）
             var entries = FilterEntries(package.Entries);
-            foreach (var entry in entries)
+            var parallelOptions = new ParallelOptions
             {
-                ExtractEntry(entry, ref outputDirectory, packageFormat);
-            }
+                MaxDegreeOfParallelism = _options.Parallel > 0 ? _options.Parallel : Environment.ProcessorCount
+            };
+            Parallel.ForEach(entries, parallelOptions, entry =>
+            {
+                ExtractEntry(entry, outputDirectory, packageFormat);
+            });
 
             // Copy project files project.json/preview image
             if (!_options.CopyProject || _options.SingleDir || file.Directory == null)
@@ -297,7 +313,7 @@ namespace RePKG.Command
         }
 
         [SuppressMessage("ReSharper", "AssignNullToNotNullAttribute")]
-        private static void ExtractEntry(PackageEntry entry, ref string outputDirectory,
+        private static void ExtractEntry(PackageEntry entry, string outputDirectory,
             PackageFormat packageFormat = PackageFormat.V)
         {
             if (Program.Closing)
@@ -313,10 +329,14 @@ namespace RePKG.Command
             Directory.CreateDirectory(Path.GetDirectoryName(filePathWithoutExtension) ?? outputDirectory);
 
             if (!_options.Overwrite && File.Exists(filePath))
-                Console.WriteLine($"* {T("跳过, 已存在: ", "Skipping, already exists: ")}{filePath}");
+            {
+                lock (ConsoleLock)
+                    Console.WriteLine($"* {T("跳过, 已存在: ", "Skipping, already exists: ")}{filePath}");
+            }
             else
             {
-                Console.WriteLine($"* {T("正在提取: ", "Extracting: ")}{entry.FullPath}");
+                lock (ConsoleLock)
+                    Console.WriteLine($"* {T("正在提取: ", "Extracting: ")}{entry.FullPath}");
 
                 File.WriteAllBytes(filePath, entry.Bytes);
             }
@@ -347,8 +367,11 @@ namespace RePKG.Command
             }
             catch (Exception e)
             {
-                Console.WriteLine(T("写入纹理失败", "Failed to write texture"));
-                Console.WriteLine(e);
+                lock (ConsoleLock)
+                {
+                    Console.WriteLine(T("写入纹理失败", "Failed to write texture"));
+                    Console.WriteLine(e);
+                }
             }
         }
 
@@ -397,7 +420,8 @@ namespace RePKG.Command
             if (Program.Closing)
                 Environment.Exit(0);
 
-            Console.WriteLine(T("* 正在读取: ", "* Reading: ") + name);
+            lock (ConsoleLock)
+                Console.WriteLine(T("* 正在读取: ", "* Reading: ") + name);
 
             try
             {
@@ -480,6 +504,9 @@ namespace RePKG.Command
 
         [Option('M', "mpkg", HelpText = "为.tex文件使用Android MPKG格式映射 (默认为桌面版PKG)")]
         public bool Mobile { get; set; }
+
+        [Option('j', "parallel", HelpText = "并行提取线程数 (默认: CPU核心数)")]
+        public int Parallel { get; set; }
 
         [Option("en", Required = false, HelpText = "Display output in English")]
         public bool English { get; set; }

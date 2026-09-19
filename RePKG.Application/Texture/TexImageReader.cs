@@ -44,7 +44,8 @@ namespace RePKG.Application.Texture
                 var mipmap = readFunction(reader);
                 mipmap.Format = format;
 
-                if (DecompressMipmapBytes)
+                // 仅对首级 mipmap 执行解压解码，后续层级跳过以节省CPU
+                if (i == 0 && DecompressMipmapBytes)
                     _texMipmapDecompressor.DecompressMipmap(mipmap);
 
                 image.Mipmaps.Add(mipmap);
