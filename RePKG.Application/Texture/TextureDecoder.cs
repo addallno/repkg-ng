@@ -44,6 +44,7 @@ namespace RePKG.Application.Texture
             Unpack565(c1raw, out var r1, out var g1, out var b1);
 
             byte r2, g2, b2, r3, g3, b3;
+            byte a3 = 255;
             if (c0raw > c1raw)
             {
                 r2 = Clamp((2 * r0 + r1) / 3); g2 = Clamp((2 * g0 + g1) / 3); b2 = Clamp((2 * b0 + b1) / 3);
@@ -52,7 +53,7 @@ namespace RePKG.Application.Texture
             else
             {
                 r2 = Clamp((r0 + r1) / 2); g2 = Clamp((g0 + g1) / 2); b2 = Clamp((b0 + b1) / 2);
-                r3 = 0; g3 = 0; b3 = 0;
+                r3 = 0; g3 = 0; b3 = 0; a3 = 0;
             }
 
             var idx = si + 4;
@@ -67,7 +68,7 @@ namespace RePKG.Application.Texture
                         case 0: SetPixel(dst, di + x * 4, r0, g0, b0, 255); break;
                         case 1: SetPixel(dst, di + x * 4, r1, g1, b1, 255); break;
                         case 2: SetPixel(dst, di + x * 4, r2, g2, b2, 255); break;
-                        case 3: SetPixel(dst, di + x * 4, r3, g3, b3, 255); break;
+                        case 3: SetPixel(dst, di + x * 4, r3, g3, b3, a3); break;
                     }
                 }
             }
@@ -122,7 +123,25 @@ namespace RePKG.Application.Texture
 
             // Color block (DXT1)
             di -= stride * 4;
+
+            // 保存 alpha 通道（DecodeDxt1Block 会覆盖 alpha）
+            Span<byte> savedAlpha = stackalloc byte[16];
+            for (int py = 0; py < 4; py++)
+            {
+                var rowDi = di + py * stride;
+                for (int px = 0; px < 4; px++)
+                    savedAlpha[py * 4 + px] = dst[rowDi + px * 4 + 3];
+            }
+
             DecodeDxt1Block(src, si + 8, dst, di, stride);
+
+            // 恢复 alpha 通道
+            for (int py = 0; py < 4; py++)
+            {
+                var rowDi = di + py * stride;
+                for (int px = 0; px < 4; px++)
+                    dst[rowDi + px * 4 + 3] = savedAlpha[py * 4 + px];
+            }
         }
 
         #endregion
@@ -606,70 +625,87 @@ namespace RePKG.Application.Texture
 
         #region BC7 解码 (16 bytes/block, 8种模式)
 
-        // BC7 模式参数表
-        // [mode] = { 颜色位数, alpha位数, 颜色索引位数, alpha索引位数, 分区数, 旋转, 是否有独立alpha索引 }
+        private static readonly int[] Bc7Anchor2 = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+        };
+
+        private static readonly int[] Bc7Weight2 = { 0, 9, 3, 6 };
+        private static readonly int[] Bc7Weight3 = { 0, 4, 9, 13, 17, 21, 26, 31 };
+
         private struct Bc7ModeInfo
         {
-            public int ColorBits, AlphaBits, ColorIndexBits, AlphaIndexBits, Partitions;
-            public bool HasRotation, Has独立AlphaIndex;
+            public int ColorBits, AlphaBits, ColorIndexBits, AlphaIndexBits, NumPartitions;
+            public bool HasRotation;
         }
 
         private static readonly Bc7ModeInfo[] Bc7Modes = {
-            new Bc7ModeInfo { ColorBits = 4, AlphaBits = 0, ColorIndexBits = 3, AlphaIndexBits = 0, Partitions = 0, HasRotation = false, Has独立AlphaIndex = false }, // mode 0
-            new Bc7ModeInfo { ColorBits = 6, AlphaBits = 0, ColorIndexBits = 3, AlphaIndexBits = 0, Partitions = 6, HasRotation = false, Has独立AlphaIndex = false }, // mode 1
-            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 0, ColorIndexBits = 2, AlphaIndexBits = 0, Partitions = 6, HasRotation = false, Has独立AlphaIndex = false }, // mode 2
-            new Bc7ModeInfo { ColorBits = 7, AlphaBits = 8, ColorIndexBits = 2, AlphaIndexBits = 0, Partitions = 0, HasRotation = true,  Has独立AlphaIndex = false }, // mode 3
-            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 6, ColorIndexBits = 2, AlphaIndexBits = 0, Partitions = 0, HasRotation = true,  Has独立AlphaIndex = false }, // mode 4
-            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 6, ColorIndexBits = 2, AlphaIndexBits = 3, Partitions = 0, HasRotation = false, Has独立AlphaIndex = true  }, // mode 5
-            new Bc7ModeInfo { ColorBits = 7, AlphaBits = 8, ColorIndexBits = 2, AlphaIndexBits = 0, Partitions = 0, HasRotation = false, Has独立AlphaIndex = false }, // mode 6
-            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 5, ColorIndexBits = 2, AlphaIndexBits = 0, Partitions = 6, HasRotation = false, Has独立AlphaIndex = false }, // mode 7
+            new Bc7ModeInfo { ColorBits = 4, AlphaBits = 0, ColorIndexBits = 3, AlphaIndexBits = 0, NumPartitions = 0, HasRotation = false },
+            new Bc7ModeInfo { ColorBits = 6, AlphaBits = 0, ColorIndexBits = 3, AlphaIndexBits = 0, NumPartitions = 6, HasRotation = false },
+            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 0, ColorIndexBits = 2, AlphaIndexBits = 0, NumPartitions = 6, HasRotation = false },
+            new Bc7ModeInfo { ColorBits = 7, AlphaBits = 8, ColorIndexBits = 2, AlphaIndexBits = 0, NumPartitions = 0, HasRotation = true  },
+            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 6, ColorIndexBits = 2, AlphaIndexBits = 0, NumPartitions = 0, HasRotation = true  },
+            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 6, ColorIndexBits = 2, AlphaIndexBits = 3, NumPartitions = 0, HasRotation = false },
+            new Bc7ModeInfo { ColorBits = 7, AlphaBits = 8, ColorIndexBits = 2, AlphaIndexBits = 0, NumPartitions = 0, HasRotation = false },
+            new Bc7ModeInfo { ColorBits = 5, AlphaBits = 0, ColorIndexBits = 2, AlphaIndexBits = 0, NumPartitions = 6, HasRotation = false },
         };
 
-        // BC7 分区锚点表 (mode1, mode2, mode7 的 6 个分区)
-        private static readonly int[][] Bc7Anchor = {
-            new[] { 0, 0, 0, 0, 0, 0 },
-            new[] { 0, 0, 0, 0, 0, 0 },
-            new[] { 0, 0, 0, 0, 0, 0 },
-        };
+        private static ulong Bc7ExtractBits(ulong lo, ulong hi, int offset, int count)
+        {
+            if (count == 0) return 0;
+            if (offset + count <= 64)
+                return (lo >> offset) & ((1UL << count) - 1);
+            if (offset >= 64)
+                return (hi >> (offset - 64)) & ((1UL << count) - 1);
+            int loBits = 64 - offset;
+            ulong loPart = (lo >> offset) & ((1UL << loBits) - 1);
+            ulong hiPart = hi & ((1UL << (count - loBits)) - 1);
+            return loPart | (hiPart << loBits);
+        }
 
-        // BC7 各模式的颜色索引位宽 (two-bit index / three-bit index / four-bit index)
-        private static readonly int[] Bc7ColorIndexBitCount = { 3, 3, 2, 2, 2, 2, 2, 2 };
-        // BC7 各模式的 alpha 索引位宽
-        private static readonly int[] Bc7AlphaIndexBitCount = { 0, 0, 0, 0, 3, 3, 0, 0 };
+        private static int Bc7Interpolate(int a, int b, int index, int bits)
+        {
+            if (bits == 2)
+            {
+                int w = Bc7Weight2[index];
+                return (a * (15 - w) + b * w + 7) >> 4;
+            }
+            else
+            {
+                int w = Bc7Weight3[index];
+                return (a * (31 - w) + b * w + 15) >> 5;
+            }
+        }
 
-        // BC7 置换表 (用于 mode4 的 three-bit color index)
-        private static readonly byte[] Bc7Perm5_3 = { 0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 0, 0, 0, 0, 0, 0 };
-        // BC7 置换表 (用于 mode6 的 two-bit color index)
-        private static readonly byte[] Bc7Perm7_3 = { 0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 0, 0, 0, 0, 0, 0 };
+        private static int Bc7Expand(int val, int bits)
+        {
+            if (bits == 8) return val;
+            if (bits == 7) return (val << 1) | (val >> 6);
+            if (bits == 6) return (val << 2) | (val >> 4);
+            if (bits == 5) return (val << 3) | (val >> 2);
+            if (bits == 4) return (val << 4) | val;
+            return val;
+        }
 
-        /// <summary>
-        /// 解码 BC7 块 (16 bytes): 高质量通用块压缩格式
-        /// 8种模式，支持分区、旋转、独立alpha索引
-        /// 实现参考: Microsoft BC7 specification + ISPC texcomp
-        /// </summary>
         private static void DecodeBc7Block(byte[] src, int si, byte[] dst, int di, int stride)
         {
-            // 读取16字节到ulong数组 (little-endian)
-            ulong[] block = new ulong[2];
-            block[0] = (ulong)src[si] | ((ulong)src[si + 1] << 8) | ((ulong)src[si + 2] << 16) | ((ulong)src[si + 3] << 24)
-                      | ((ulong)src[si + 4] << 32) | ((ulong)src[si + 5] << 40) | ((ulong)src[si + 6] << 48) | ((ulong)src[si + 7] << 56);
-            block[1] = (ulong)src[si + 8] | ((ulong)src[si + 9] << 8) | ((ulong)src[si + 10] << 16) | ((ulong)src[si + 11] << 24)
-                      | ((ulong)src[si + 12] << 32) | ((ulong)src[si + 13] << 40) | ((ulong)src[si + 14] << 48) | ((ulong)src[si + 15] << 56);
+            ulong lo = 0, hi = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                lo |= (ulong)src[si + i] << (8 * i);
+                hi |= (ulong)src[si + 8 + i] << (8 * i);
+            }
 
-            // 检测模式: 找到第一个设置的位
             int mode = -1;
             for (int i = 0; i < 8; i++)
             {
-                if ((block[0] & (1UL << i)) != 0)
-                {
-                    mode = i;
-                    break;
-                }
+                if ((lo & (1UL << i)) != 0) { mode = i; break; }
             }
 
             if (mode < 0)
             {
-                // 无有效位，输出黑色+不透明
                 for (int py = 0; py < 4; py++)
                 {
                     var rowDi = di + py * stride;
@@ -680,242 +716,105 @@ namespace RePKG.Application.Texture
             }
 
             var info = Bc7Modes[mode];
-
-            // 提取锚点索引 (mode 1, 2, 7 有分区)
-            // 简化处理：mode 0/3/4/5/6 无分区 (单分区)
-            // mode 1/2/7 有 6 个分区 (两子集)
-
-            // 解析固定位之后的数据
-            int bit = 8; // 跳过8个模式位
-
-            // 分区索引 (如果有分区)
+            int bit = 8;
             int partition = 0;
-            if (info.Partitions == 6)
-            {
-                partition = (int)((block[0] >> bit) & 0x3F);
-                bit += 6;
-            }
-
-            // 旋转 (如果支持)
+            if (info.NumPartitions > 0) { partition = (int)Bc7ExtractBits(lo, hi, bit, 6); bit += 6; }
             int rotation = 0;
-            if (info.HasRotation)
-            {
-                rotation = (int)((block[0] >> bit) & 0x3);
-                bit += 2;
-            }
-
-            // 独立 alpha 索引选择 (mode 5)
+            if (info.HasRotation) { rotation = (int)Bc7ExtractBits(lo, hi, bit, 2); bit += 2; }
             int alphaIndexSelector = 0;
-            if (info.Has独立AlphaIndex)
+            if (mode == 5) { alphaIndexSelector = (int)Bc7ExtractBits(lo, hi, bit, 1); bit += 1; }
+
+            int cb = info.ColorBits;
+            int ab = info.AlphaBits;
+            int subsetCount = (info.NumPartitions > 0) ? 2 : 1;
+            int epCount = (mode == 0) ? 6 : subsetCount;
+            int[,] ep = new int[6, 4];
+
+            if (mode == 0)
             {
-                alphaIndexSelector = (int)((block[0] >> bit) & 0x1);
-                bit += 1;
-            }
-
-            // ---- 提取端点 ----
-            // 每个端点: R, G, B, A (颜色位数 + alpha 位数)
-            // mode 0: 6 个 4-4-4 颜色端点 (4bit/channel)
-            // mode 1: 2 组 (4+2)*3 颜色端点 (6bit/channel)
-            // mode 2: 2 组 5-5-5 颜色端点 (5bit/channel)
-            // mode 3: 2 组 7-7-7-8 RGBA 端点
-            // mode 4: 2 组 5-6-5 RGBA 端点 (颜色5+alpha6)
-            // mode 5: 2 组 5-6-5+5-6-5 RGBA 端点 (颜色5+alpha6, 独立alpha索引)
-            // mode 6: 2 组 7-7-7-8 RGBA 端点
-            // mode 7: 2 组 5-5-5 颜色端点 (6bit/channel, 有分区)
-
-            // 提取颜色端点
-            int numEndpoints = info.Partitions == 0 ? 2 : 2; // 总是2个端点
-            int[,] endpoints = new int[2, 4]; // [endpoint, channel]
-
-            // 从块数据中提取端点位
-            ulong endpointBits = block[0] >> bit;
-            int endpointBitCount = (128 - bit);
-            // 也使用 block[1]
-            ulong endpointBitsHi = block[1];
-            int totalEndpointBits = info.ColorBits * 3 * numEndpoints + info.AlphaBits * numEndpoints;
-
-            // 按位提取端点
-            int epBit = 0;
-            for (int ep = 0; ep < numEndpoints; ep++)
-            {
-                // 提取 R, G, B
-                for (int ch = 0; ch < 3; ch++)
-                {
-                    endpoints[ep, ch] = (int)GetBits(endpointBits, ref epBit, info.ColorBits);
-                }
-                // 提取 A (如果有)
-                if (info.AlphaBits > 0)
-                {
-                    endpoints[ep, 3] = (int)GetBits(endpointBits, ref epBit, info.AlphaBits);
-                }
-                else
-                {
-                    endpoints[ep, 3] = 255; // 无 alpha 时设为不透明
-                }
-            }
-
-            // 扩展位到 8 位
-            for (int ep = 0; ep < numEndpoints; ep++)
-            {
-                // 颜色位扩展
-                if (info.ColorBits == 4)
-                {
-                    endpoints[ep, 0] = Expand4(endpoints[ep, 0]);
-                    endpoints[ep, 1] = Expand4(endpoints[ep, 1]);
-                    endpoints[ep, 2] = Expand4(endpoints[ep, 2]);
-                }
-                else if (info.ColorBits == 5)
-                {
-                    endpoints[ep, 0] = Expand5(endpoints[ep, 0]);
-                    endpoints[ep, 1] = Expand5(endpoints[ep, 1]);
-                    endpoints[ep, 2] = Expand5(endpoints[ep, 2]);
-                }
-                else if (info.ColorBits == 6)
-                {
-                    endpoints[ep, 0] = Expand6(endpoints[ep, 0]);
-                    endpoints[ep, 1] = Expand6(endpoints[ep, 1]);
-                    endpoints[ep, 2] = Expand6(endpoints[ep, 2]);
-                }
-                else if (info.ColorBits == 7)
-                {
-                    endpoints[ep, 0] = Expand7(endpoints[ep, 0]);
-                    endpoints[ep, 1] = Expand7(endpoints[ep, 1]);
-                    endpoints[ep, 2] = Expand7(endpoints[ep, 2]);
-                }
-
-                // Alpha 位扩展
-                if (info.AlphaBits == 5)
-                    endpoints[ep, 3] = Expand5(endpoints[ep, 3]);
-                else if (info.AlphaBits == 6)
-                    endpoints[ep, 3] = Expand6(endpoints[ep, 3]);
-                else if (info.AlphaBits == 8)
-                    endpoints[ep, 3] = Clamp(endpoints[ep, 3]);
-            }
-
-            // ---- 提取索引 ----
-            int colorIndexBits = Bc7ColorIndexBitCount[mode];
-            int alphaIndexBits = Bc7AlphaIndexBitCount[mode];
-
-            // 计算索引起始位
-            int indexBitStart = bit + totalEndpointBits;
-
-            // 读取索引数据
-            // 索引数据紧跟在端点之后，需要足够的位数
-            // 16字节 = 128位，索引从 indexBitStart 开始
-            byte[,] colorIndices = new byte[16, 1]; // 4x4 像素的颜色索引
-            byte[,] alphaIndices = new byte[16, 1]; // 4x4 像素的 alpha 索引
-
-            // 从块中提取索引位
-            ulong indexBits = 0;
-            // 需要从 block[0] 和 block[1] 中提取索引位
-            if (indexBitStart < 64)
-            {
-                indexBits = block[0] >> indexBitStart;
-                if (indexBitStart + 64 < 128)
-                    indexBits |= block[1] << (64 - indexBitStart);
+                for (int e = 0; e < 6; e++) ep[e, 0] = (int)Bc7ExtractBits(lo, hi, bit, 4); bit += 4;
+                for (int e = 0; e < 6; e++) ep[e, 1] = (int)Bc7ExtractBits(lo, hi, bit, 4); bit += 4;
+                for (int e = 0; e < 6; e++) ep[e, 2] = (int)Bc7ExtractBits(lo, hi, bit, 4); bit += 4;
+                for (int e = 0; e < 6; e++) { ep[e, 3] = 255; ep[e, 0] = Bc7Expand(ep[e, 0], 4); ep[e, 1] = Bc7Expand(ep[e, 1], 4); ep[e, 2] = Bc7Expand(ep[e, 2], 4); }
             }
             else
             {
-                indexBits = block[1] >> (indexBitStart - 64);
+                for (int e = 0; e < epCount; e++) ep[e, 0] = (int)Bc7ExtractBits(lo, hi, bit, cb); bit += cb;
+                for (int e = 0; e < epCount; e++) ep[e, 1] = (int)Bc7ExtractBits(lo, hi, bit, cb); bit += cb;
+                for (int e = 0; e < epCount; e++) ep[e, 2] = (int)Bc7ExtractBits(lo, hi, bit, cb); bit += cb;
+                if (ab > 0)
+                {
+                    for (int e = 0; e < epCount; e++) ep[e, 3] = (int)Bc7ExtractBits(lo, hi, bit, ab); bit += ab;
+                    for (int e = 0; e < epCount; e++) ep[e, 3] = Bc7Expand(ep[e, 3], ab);
+                }
+                else
+                {
+                    for (int e = 0; e < epCount; e++) ep[e, 3] = 255;
+                }
+                for (int e = 0; e < epCount; e++) { ep[e, 0] = Bc7Expand(ep[e, 0], cb); ep[e, 1] = Bc7Expand(ep[e, 1], cb); ep[e, 2] = Bc7Expand(ep[e, 2], cb); }
             }
 
-            int idxBit = 0;
-            for (int py = 0; py < 4; py++)
+            int colorIndexBits = info.ColorIndexBits;
+            int alphaIndexBits = info.AlphaIndexBits;
+            byte[] colorIdx = new byte[16];
+            byte[] alphaIdx = new byte[16];
+
+            for (int px = 0; px < 16; px++)
             {
-                for (int px = 0; px < 4; px++)
+                colorIdx[px] = (byte)Bc7ExtractBits(lo, hi, bit, colorIndexBits); bit += colorIndexBits;
+                if (alphaIndexBits > 0)
                 {
-                    int pixelIdx = py * 4 + px;
-                    colorIndices[pixelIdx, 0] = (byte)GetBits(indexBits, ref idxBit, colorIndexBits);
-                    if (alphaIndexBits > 0)
-                        alphaIndices[pixelIdx, 0] = (byte)GetBits(indexBits, ref idxBit, alphaIndexBits);
+                    alphaIdx[px] = (byte)Bc7ExtractBits(lo, hi, bit, alphaIndexBits); bit += alphaIndexBits;
                 }
             }
 
-            // ---- 计算最终颜色 ----
-            // BC7 使用不对称插值: 带符号的插值权重
-            // 颜色: 2bit index 用 { -3, -1, 1, 3 } / 4
-            // alpha: 3bit index 用 { -3, -1, 1, 3 } / 4 (mode 5)
-            // alpha: 3bit index 用 { -3, -1, 1, 3 } / 4 (mode 5)
-
-            // 简化: 使用标准插值 (实际上 BC7 有更复杂的逻辑，但基本实现足够)
             for (int py = 0; py < 4; py++)
             {
                 var rowDi = di + py * stride;
                 for (int px = 0; px < 4; px++)
                 {
-                    int pixelIdx = py * 4 + px;
-                    int ep = 0; // 单分区时总是端点0
-
-                    // 插值颜色
-                    int r = InterpolateBc7(endpoints[ep, 0], endpoints[numEndpoints > 1 ? 1 : 0, 0], colorIndices[pixelIdx, 0], colorIndexBits);
-                    int g = InterpolateBc7(endpoints[ep, 1], endpoints[numEndpoints > 1 ? 1 : 0, 1], colorIndices[pixelIdx, 0], colorIndexBits);
-                    int b = InterpolateBc7(endpoints[ep, 2], endpoints[numEndpoints > 1 ? 1 : 0, 2], colorIndices[pixelIdx, 0], colorIndexBits);
-
-                    int a;
-                    if (info.AlphaBits > 0 && alphaIndexBits > 0)
+                    int pidx = py * 4 + px;
+                    int subset = 0;
+                    if (info.NumPartitions > 0)
                     {
-                        // 有 alpha 通道，使用独立 alpha 索引
-                        a = InterpolateBc7(endpoints[ep, 3], endpoints[numEndpoints > 1 ? 1 : 0, 3], alphaIndices[pixelIdx, 0], alphaIndexBits);
+                        int anchor = Bc7Anchor2[partition];
+                        if (pidx == 0) subset = 0;
+                        else if (pidx == anchor) subset = 1;
+                        else subset = ((partition >> (pidx - 1)) & 1);
                     }
-                    else if (info.AlphaBits > 0)
+                    int ep0 = subset * 2;
+                    int ep1 = ep0 + 1;
+                    int r = Bc7Interpolate(ep[ep0, 0], ep[ep1, 0], colorIdx[pidx], colorIndexBits);
+                    int g = Bc7Interpolate(ep[ep0, 1], ep[ep1, 1], colorIdx[pidx], colorIndexBits);
+                    int b = Bc7Interpolate(ep[ep0, 2], ep[ep1, 2], colorIdx[pidx], colorIndexBits);
+                    int a;
+                    if (ab > 0 && alphaIndexBits > 0)
                     {
-                        // 有 alpha 但无独立索引，使用颜色索引
-                        a = InterpolateBc7(endpoints[ep, 3], endpoints[numEndpoints > 1 ? 1 : 0, 3], colorIndices[pixelIdx, 0], colorIndexBits);
+                        int ai = (mode == 5 && alphaIndexSelector == 1) ? pidx : alphaIdx[pidx];
+                        a = Bc7Interpolate(ep[ep0, 3], ep[ep1, 3], ai, alphaIndexBits);
+                    }
+                    else if (ab > 0)
+                    {
+                        a = Bc7Interpolate(ep[ep0, 3], ep[ep1, 3], colorIdx[pidx], colorIndexBits);
                     }
                     else
                     {
-                        // 无 alpha，设为255
                         a = 255;
                     }
-
-                    // 旋转: mode 3/4 支持通道旋转 (0=无, 1=R→A, 2=G→A, 3=B→A)
                     if (info.HasRotation && rotation > 0)
                     {
-                        // 简化: 跳过旋转处理 (实际应用中旋转不常见)
-                        // 完整实现需要交换对应通道
+                        int tmp;
+                        if (rotation == 1) { tmp = r; r = a; a = tmp; }
+                        else if (rotation == 2) { tmp = g; g = a; a = tmp; }
+                        else if (rotation == 3) { tmp = b; b = a; a = tmp; }
                     }
-
                     SetPixel(dst, rowDi + px * 4, Clamp(r), Clamp(g), Clamp(b), Clamp(a));
                 }
             }
         }
 
-        /// <summary>从位流中提取指定位数</summary>
-        private static ulong GetBits(ulong bits, ref int bitPos, int count)
-        {
-            ulong result = (bits >> bitPos) & ((1UL << count) - 1);
-            bitPos += count;
-            return result;
-        }
-
-        /// <summary>BC7 插值: a, b 为8位端点, index 为索引, bits 为索引位宽</summary>
-        private static int InterpolateBc7(int a, int b, int index, int bits)
-        {
-            // BC7 使用带符号的缩放
-            // 2-bit index: weights = { 0, 9, 3, 6 } → 标准 DXT 插值
-            // 实际上 BC7 的插值比 DXT 更复杂，这里用简化版本
-            if (bits == 2)
-            {
-                // 2-bit: 4 个级别
-                switch (index)
-                {
-                    case 0: return a;
-                    case 1: return (a * 9 + b * 3 + 6) >> 4; // ≈ 5/8 * a + 3/8 * b
-                    case 2: return (a * 3 + b * 9 + 6) >> 4; // ≈ 3/8 * a + 5/8 * b
-                    case 3: return b;
-                }
-            }
-            else if (bits == 3)
-            {
-                // 3-bit: 8 个级别 (实际 BC7 使用 { -3,-1,1,3 }/4 缩放)
-                // 简化为线性插值
-                return (a * (7 - index) + b * index + 3) / 7;
-            }
-
-            return a;
-        }
-
         #endregion
+
 
         #region 简单格式转换
 

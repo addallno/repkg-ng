@@ -120,6 +120,15 @@ namespace RePKG.Command
                     ConvertToImageAndSave(tex, filePath, _options.Overwrite);
                     var jsonInfo = _texJsonInfoGenerator.GenerateInfo(tex);
                     File.WriteAllText($"{filePath}.tex-json", jsonInfo);
+
+                    if (_options.NoKeepTex)
+                    {
+                        if (File.Exists(fileInfo.FullName))
+                            File.Delete(fileInfo.FullName);
+                        var texJsonPath = $"{filePath}.tex-json";
+                        if (File.Exists(texJsonPath))
+                            File.Delete(texJsonPath);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -186,6 +195,15 @@ namespace RePKG.Command
                     ConvertToImageAndSave(tex, filePath, _options.Overwrite);
                     var jsonInfo = _texJsonInfoGenerator.GenerateInfo(tex);
                     File.WriteAllText($"{filePath}.tex-json", jsonInfo);
+
+                    if (_options.NoKeepTex)
+                    {
+                        if (File.Exists(fileInfo.FullName))
+                            File.Delete(fileInfo.FullName);
+                        var texJsonPath = $"{filePath}.tex-json";
+                        if (File.Exists(texJsonPath))
+                            File.Delete(texJsonPath);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -317,6 +335,15 @@ namespace RePKG.Command
                 ConvertToImageAndSave(tex, filePathWithoutExtension, _options.Overwrite);
                 var jsonInfo = _texJsonInfoGenerator.GenerateInfo(tex);
                 File.WriteAllText($"{filePathWithoutExtension}.tex-json", jsonInfo);
+
+                if (_options.NoKeepTex)
+                {
+                    if (File.Exists(filePath))
+                        File.Delete(filePath);
+                    var texJsonPath = $"{filePathWithoutExtension}.tex-json";
+                    if (File.Exists(texJsonPath))
+                        File.Delete(texJsonPath);
+                }
             }
             catch (Exception e)
             {
@@ -447,6 +474,9 @@ namespace RePKG.Command
 
         [Option("overwrite", HelpText = "覆盖所有已存在的文件")]
         public bool Overwrite { get; set; }
+
+        [Option("no-keep-tex", HelpText = "转换.tex为图片后自动删除原始.tex和.tex-json文件")]
+        public bool NoKeepTex { get; set; }
 
         [Option('M', "mpkg", HelpText = "为.tex文件使用Android MPKG格式映射 (默认为桌面版PKG)")]
         public bool Mobile { get; set; }
