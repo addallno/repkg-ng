@@ -180,7 +180,7 @@ namespace RePKG.Command
                 using (var reader = new BinaryReader(file.Open(FileMode.Open, FileAccess.Read, FileShare.Read)))
                 {
                     reader.BaseStream.Seek(projectEntry.Offset + package.HeaderSize, SeekOrigin.Begin);
-                    var bytes = reader.ReadBytes(projectEntry.Length);
+                    var bytes = reader.ReadBytes((int)projectEntry.Length);
                     if (bytes != null && bytes.Length > 0)
                     {
                         try
@@ -319,7 +319,7 @@ namespace RePKG.Command
                 using (var reader = new BinaryReader(file.Open(FileMode.Open, FileAccess.Read, FileShare.Read)))
                 {
                     reader.BaseStream.Seek(projectEntry.Offset + package.HeaderSize, SeekOrigin.Begin);
-                    var bytes = reader.ReadBytes(projectEntry.Length);
+                    var bytes = reader.ReadBytes((int)projectEntry.Length);
                     if (bytes != null && bytes.Length > 0)
                         try { projectJson = JObject.Parse(Encoding.UTF8.GetString(bytes)); } catch { }
                 }

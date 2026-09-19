@@ -98,7 +98,7 @@ namespace RePKG.Command
                 if (entry.Type == EntryType.Tex && ShouldConvert(filePath, options.ForceConvert))
                 {
                     var useLz4 = !options.NoLz4;
-                    if (options.ForceConvert && Path.GetExtension(filePath) == ".tex")
+                    if (options.ForceConvert && Path.GetExtension(filePath).Equals(".tex", StringComparison.OrdinalIgnoreCase))
                     {
                         Console.WriteLine($"{T("正在重编码: ", "Re-encoding: ")}{filePath} -> TEX");
                         newBytes = ReencodeTexFile(filePath, useLz4);
@@ -121,7 +121,7 @@ namespace RePKG.Command
                 Console.WriteLine($"{T("已替换: ", "Replaced: ")}{entry.FullPath} ({newBytes.Length} bytes)");
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)));
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".");
 
             using (var writer = new BinaryWriter(File.Create(outputPath)))
             {
@@ -158,6 +158,8 @@ namespace RePKG.Command
             if (tex.IsVideoTexture)
             {
                 // Video TEX: extract MP4 bytes, re-wrap in video TEX
+                if (tex.FirstImage?.FirstMipmap == null)
+                    throw new InvalidOperationException("Video texture has no image/mipmap data");
                 var mp4Bytes = tex.FirstImage.FirstMipmap.Bytes;
                 var width = tex.Header.TextureWidth;
                 var height = tex.Header.ImageHeight;
@@ -284,6 +286,9 @@ namespace RePKG.Command
             {
                 tex = ImageToTexConverter.Convert(filePath, TexFormat.RGBA8888, useLz4);
             }
+
+            if (tex == null)
+                throw new InvalidOperationException($"Failed to convert file to TEX: {filePath}");
 
             using (var ms = new MemoryStream())
             using (var writer = new BinaryWriter(ms))

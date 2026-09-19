@@ -11,12 +11,19 @@ namespace RePKG.Application
             if (reader == null) throw new ArgumentNullException(nameof(reader));
             
             var builder = new StringBuilder(maxLength <= 0 ? 16 : maxLength);
-            var c = reader.ReadChar();
-
-            while (c != '\0' && (maxLength == -1 || builder.Length < maxLength))
+            try
             {
-                builder.Append(c);
-                c = reader.ReadChar();
+                var c = reader.ReadChar();
+
+                while (c != '\0' && (maxLength == -1 || builder.Length < maxLength))
+                {
+                    builder.Append(c);
+                    c = reader.ReadChar();
+                }
+            }
+            catch (EndOfStreamException)
+            {
+                throw new InvalidDataException("Unterminated string in stream (missing null terminator)");
             }
 
             return builder.ToString();

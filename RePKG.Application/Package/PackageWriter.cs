@@ -25,22 +25,25 @@ namespace RePKG.Application.Package
         {
             writer.Write(entries.Count);
 
-            var currentOffset = 0;
+            long currentOffset = 0;
 
             foreach (var entry in entries)
             {
                 if (entry == null)
-                    throw new NullReferenceException("Entry is null");
+                    throw new ArgumentNullException(nameof(entry), "Entry is null");
 
                 if (string.IsNullOrWhiteSpace(entry.FullPath))
-                    throw new NullReferenceException($"Entry property `{nameof(entry.FullPath)}` is null or empty");
+                    throw new ArgumentException($"Entry property `{nameof(entry.FullPath)}` is null or empty");
 
                 if (entry.Bytes == null)
-                    throw new NullReferenceException($"Entry property `{nameof(entry.Bytes)}` is null");
+                    throw new ArgumentException($"Entry property `{nameof(entry.Bytes)}` is null");
 
                 writer.WriteStringI32Size(entry.FullPath);
 
-                writer.Write(currentOffset);
+                if (currentOffset > int.MaxValue || entry.Bytes.Length > int.MaxValue)
+                    throw new InvalidOperationException($"Package entry too large: {entry.FullPath}");
+
+                writer.Write((int)currentOffset);
                 writer.Write(entry.Bytes.Length);
 
                 entry.Offset = currentOffset;

@@ -22,8 +22,8 @@ namespace RePKG.Application.Package
 
             ReadEntries(package.Entries, reader);
 
-            var dataStart = (int) reader.BaseStream.Position;
-            package.HeaderSize = (int) (dataStart - packageStart);
+            var dataStart = reader.BaseStream.Position;
+            package.HeaderSize = dataStart - packageStart;
 
             if (!ReadEntryBytes)
                 return package;
@@ -51,12 +51,14 @@ namespace RePKG.Application.Package
             }
         }
 
-        private static void PopulateEntriesWithData(int dataStart, List<PackageEntry> entries, BinaryReader reader)
+        private static void PopulateEntriesWithData(long dataStart, List<PackageEntry> entries, BinaryReader reader)
         {
             foreach (var entry in entries)
             {
                 reader.BaseStream.Seek(entry.Offset + dataStart, SeekOrigin.Begin);
-                entry.Bytes = reader.ReadBytes(entry.Length);
+                if (entry.Length > int.MaxValue)
+                    throw new InvalidDataException($"Entry too large to read: {entry.FullPath} ({entry.Length} bytes)");
+                entry.Bytes = reader.ReadBytes((int)entry.Length);
             }
         }
     }

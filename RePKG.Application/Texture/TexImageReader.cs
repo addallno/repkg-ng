@@ -106,6 +106,9 @@ namespace RePKG.Application.Texture
         {
             var byteCount = reader.ReadInt32();
 
+            if (byteCount < 0)
+                throw new UnsafeTexException($"Negative mipmap byte count: {byteCount}");
+
             if (reader.BaseStream.Position + byteCount > reader.BaseStream.Length)
                 throw new UnsafeTexException("Detected invalid mipmap byte count - exceeds stream length");
 

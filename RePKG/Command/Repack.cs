@@ -92,7 +92,7 @@ namespace RePKG.Command
                 Console.WriteLine($"{T("格式", "Format")}: {format}, LZ4: {options.Lz4}");
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)));
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".");
 
             using (var writer = new BinaryWriter(File.Open(outputPath, FileMode.Create, FileAccess.Write)))
             {
@@ -128,7 +128,7 @@ namespace RePKG.Command
 
             foreach (var file in files)
             {
-                var relativePath = file.FullName.Substring(basePath.Length + 1);
+                var relativePath = file.FullName.Substring(basePath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 var bytes = File.ReadAllBytes(file.FullName);
 
                 package.Entries.Add(new PackageEntry
@@ -145,7 +145,7 @@ namespace RePKG.Command
                 return;
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)));
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".");
 
             using (var writer = new BinaryWriter(File.Open(outputPath, FileMode.Create, FileAccess.Write)))
             {

@@ -30,7 +30,7 @@ namespace RePKG.Command
             {
                 var ext = Path.GetExtension(inputPath);
                 var name = Path.GetFileNameWithoutExtension(inputPath);
-                var outExt = ext == ".mpkg" ? ".pkg" : ".mpkg";
+                var outExt = ext.Equals(".mpkg", StringComparison.OrdinalIgnoreCase) ? ".pkg" : ".mpkg";
                 outputPath = Path.Combine(
                     Path.GetDirectoryName(inputPath) ?? ".",
                     $"{name}.converted{outExt}");
@@ -40,8 +40,8 @@ namespace RePKG.Command
             var targetMagic = options.Magic;
             if (string.IsNullOrEmpty(targetMagic))
             {
-                var inputExt = Path.GetExtension(inputPath)?.ToLowerInvariant();
-                var outputExt = Path.GetExtension(outputPath)?.ToLowerInvariant();
+                var inputExt = Path.GetExtension(inputPath).ToLowerInvariant();
+                var outputExt = Path.GetExtension(outputPath).ToLowerInvariant();
 
                 if (options.Android || outputExt == ".mpkg")
                     targetMagic = "PKGM0019";

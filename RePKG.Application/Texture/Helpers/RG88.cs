@@ -153,7 +153,7 @@ namespace RePKG.Application.Texture.Helpers
             G = DownScaleFrom16BitTo8Bit(source.G);
         }
 
-        public override bool Equals(object obj) => obj is Argb32 argb32 && Equals(argb32);
+        public override bool Equals(object obj) => obj is RG88 other && Equals(other);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(RG88 other) => Rg == other.Rg;

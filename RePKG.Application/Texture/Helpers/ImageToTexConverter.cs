@@ -183,19 +183,29 @@ namespace RePKG.Application.Texture.Helpers
                     return MipmapFormat.RGBA8888;
 
                 case TexFormat.R8:
-                    pixelData = new byte[width * height];
-                    for (int i = 0; i < width * height; i++)
+                {
+                    long pixCount = (long)width * height;
+                    if (pixCount > int.MaxValue)
+                        throw new ArgumentException($"Image too large for R8: {width}x{height}");
+                    pixelData = new byte[(int)pixCount];
+                    for (int i = 0; i < (int)pixCount; i++)
                         pixelData[i] = (byte)((pixels[i].R * 299 + pixels[i].G * 587 + pixels[i].B * 114) / 1000);
                     return MipmapFormat.R8;
+                }
 
                 case TexFormat.RG88:
-                    pixelData = new byte[width * height * 2];
-                    for (int i = 0; i < width * height; i++)
+                {
+                    long pixCount = (long)width * height;
+                    if (pixCount * 2 > int.MaxValue)
+                        throw new ArgumentException($"Image too large for RG88: {width}x{height}");
+                    pixelData = new byte[(int)pixCount * 2];
+                    for (int i = 0; i < (int)pixCount; i++)
                     {
                         pixelData[i * 2] = pixels[i].R;
                         pixelData[i * 2 + 1] = pixels[i].G;
                     }
                     return MipmapFormat.RG88;
+                }
 
                 case TexFormat.Mobile:
                     pixelData = PixelDataFromRgba32(pixels, width, height);
@@ -208,7 +218,10 @@ namespace RePKG.Application.Texture.Helpers
 
         private static byte[] PixelDataFromRgba32(Rgba32[] pixels, int width, int height)
         {
-            var data = new byte[width * height * 4];
+            long size = (long)width * height * 4;
+            if (size > int.MaxValue)
+                throw new ArgumentException($"Image too large: {width}x{height}");
+            var data = new byte[(int)size];
             for (int i = 0; i < width * height; i++)
             {
                 data[i * 4] = pixels[i].R;

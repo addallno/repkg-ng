@@ -530,7 +530,25 @@ namespace RePKG.Application.Texture
         private static void DecodeEtc2A8Block(byte[] src, int si, byte[] dst, int di, int stride)
         {
             DecodeEacAlphaBlock(src, si, dst, di, stride);
+
+            // 保存 alpha 通道（DecodeEtc2ColorBlock 会将其清零）
+            Span<byte> savedAlpha = stackalloc byte[16];
+            for (int py = 0; py < 4; py++)
+            {
+                var rowDi = di + py * stride;
+                for (int px = 0; px < 4; px++)
+                    savedAlpha[py * 4 + px] = dst[rowDi + px * 4 + 3];
+            }
+
             DecodeEtc2ColorBlock(src, si + 8, dst, di, stride);
+
+            // 恢复 alpha 通道
+            for (int py = 0; py < 4; py++)
+            {
+                var rowDi = di + py * stride;
+                for (int px = 0; px < 4; px++)
+                    dst[rowDi + px * 4 + 3] = savedAlpha[py * 4 + px];
+            }
         }
 
         /// <summary>
@@ -938,11 +956,22 @@ namespace RePKG.Application.Texture
 
         #region 主调度
 
+        private static byte[] AllocateRgbaBuffer(int width, int height)
+        {
+            long size = (long)width * height * 4;
+            if (size > int.MaxValue)
+                throw new ArgumentException($"Texture too large for decoding: {width}x{height} ({size} bytes)");
+            return new byte[(int)size];
+        }
+
         /// <summary>
         /// 将任意 MipmapFormat 数据解码为 RGBA8888。
         /// </summary>
         public static byte[] Decode(int width, int height, byte[] data, Core.Texture.MipmapFormat format)
         {
+            if (width <= 0 || height <= 0)
+                throw new ArgumentException($"Invalid texture dimensions: {width}x{height}");
+
             switch (format)
             {
                 case Core.Texture.MipmapFormat.RGBA8888:
@@ -950,21 +979,21 @@ namespace RePKG.Application.Texture
 
                 case Core.Texture.MipmapFormat.RGB565:
                 {
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     DecodeRgb565(data, 0, out8, 0, width * height);
                     return out8;
                 }
 
                 case Core.Texture.MipmapFormat.RGB888:
                 {
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     DecodeRgb888(data, 0, out8, 0, width * height);
                     return out8;
                 }
 
                 case Core.Texture.MipmapFormat.RGBA4444:
                 {
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     DecodeRgba4444(data, 0, out8, 0, width * height);
                     return out8;
                 }
@@ -972,7 +1001,7 @@ namespace RePKG.Application.Texture
                 case Core.Texture.MipmapFormat.CompressedDXT1:
                 case Core.Texture.MipmapFormat.CompressedDXT1Alpha:
                 {
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     int si = 0;
                     for (int y = 0; y < height; y += 4)
                     for (int x = 0; x < width; x += 4, si += 8)
@@ -984,7 +1013,7 @@ namespace RePKG.Application.Texture
 
                 case Core.Texture.MipmapFormat.CompressedDXT3:
                 {
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     int si = 0;
                     for (int y = 0; y < height; y += 4)
                     for (int x = 0; x < width; x += 4, si += 16)
@@ -996,7 +1025,7 @@ namespace RePKG.Application.Texture
 
                 case Core.Texture.MipmapFormat.CompressedDXT5:
                 {
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     int si = 0;
                     for (int y = 0; y < height; y += 4)
                     for (int x = 0; x < width; x += 4, si += 16)
@@ -1009,7 +1038,7 @@ namespace RePKG.Application.Texture
                 case Core.Texture.MipmapFormat.CompressedETC2:
                 {
                     // ETC2_RGBA8: 16 bytes/block (EAC alpha 8B + ETC2 color 8B)
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     int si = 0;
                     for (int y = 0; y < height; y += 4)
                     for (int x = 0; x < width; x += 4, si += 16)
@@ -1022,7 +1051,7 @@ namespace RePKG.Application.Texture
                 case Core.Texture.MipmapFormat.CompressedBC4:
                 {
                     // BC4: 8 bytes/block, 单通道灰度
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     int si = 0;
                     for (int y = 0; y < height; y += 4)
                     for (int x = 0; x < width; x += 4, si += 8)
@@ -1035,7 +1064,7 @@ namespace RePKG.Application.Texture
                 case Core.Texture.MipmapFormat.CompressedBC7:
                 {
                     // BC7: 16 bytes/block, 8种模式
-                    var out8 = new byte[width * height * 4];
+                    var out8 = AllocateRgbaBuffer(width, height);
                     int si = 0;
                     for (int y = 0; y < height; y += 4)
                     for (int x = 0; x < width; x += 4, si += 16)

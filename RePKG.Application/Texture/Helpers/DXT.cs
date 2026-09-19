@@ -21,6 +21,7 @@
 // most of the algorithms and data used in this Class-file has been ported from LibSquish!
 // http://code.google.com/p/libsquish/
 
+using System;
 using RePKG.Core.Texture;
 
 namespace RePKG.Application.Texture.Helpers
@@ -192,7 +193,10 @@ namespace RePKG.Application.Texture.Helpers
 
         public static byte[] DecompressImage(int width, int height, byte[] data, DXTFlags flags)
         {
-            var rgba = new byte[width * height * 4];
+            long size = (long)width * height * 4;
+            if (size > int.MaxValue)
+                throw new ArgumentException($"Texture too large for DXT decompression: {width}x{height}");
+            var rgba = new byte[(int)size];
 
             // initialise the block input
             var sourceBlock_pos = 0;
@@ -207,7 +211,7 @@ namespace RePKG.Application.Texture.Helpers
                     // decompress the block
                     var targetRGBA_pos = 0;
 
-                    if (data.Length == sourceBlock_pos)
+                    if (data.Length - sourceBlock_pos < bytesPerBlock)
                         continue;
 
                     Decompress(targetRGBA, data, sourceBlock_pos, flags);

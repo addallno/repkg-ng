@@ -49,10 +49,10 @@ namespace RePKG.Command
             }
 
             if (!string.IsNullOrEmpty(_options.IgnoreExts))
-                _skipExtArray = NormalizeExtensions(_options.IgnoreExts.Split(','));
+                _skipExtArray = NormalizeExtensions(_options.IgnoreExts.Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray());
 
             if (!string.IsNullOrEmpty(_options.OnlyExts))
-                _onlyExtArray = NormalizeExtensions(_options.OnlyExts.Split(','));
+                _onlyExtArray = NormalizeExtensions(_options.OnlyExts.Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToArray());
 
             var fileInfo = new FileInfo(options.Input);
             var directoryInfo = new DirectoryInfo(options.Input);
@@ -145,6 +145,12 @@ namespace RePKG.Command
                 }
 
                 return;
+            }
+
+            foreach (var file in directoryInfo.EnumerateFiles("*.pkg")
+                .Concat(directoryInfo.EnumerateFiles("*.mpkg")))
+            {
+                ExtractPkg(file);
             }
 
             foreach (var directory in directoryInfo.EnumerateDirectories())
@@ -286,7 +292,7 @@ namespace RePKG.Command
 
             var filePath = filePathWithoutExtension + entry.Extension;
 
-            Directory.CreateDirectory(Path.GetDirectoryName(filePathWithoutExtension));
+            Directory.CreateDirectory(Path.GetDirectoryName(filePathWithoutExtension) ?? outputDirectory);
 
             if (!_options.Overwrite && File.Exists(filePath))
                 Console.WriteLine($"* {T("跳过, 已存在: ", "Skipping, already exists: ")}{filePath}");
@@ -330,8 +336,11 @@ namespace RePKG.Command
                 return;
 
             dynamic json = JsonConvert.DeserializeObject(File.ReadAllText(projectJson[0].FullName));
-            title = json.title;
-            preview = json.preview;
+            if (json != null)
+            {
+                title = json.title ?? title;
+                preview = json.preview ?? preview;
+            }
         }
 
         private static void GetProjectFolderNameAndPreviewImage(FileInfo packageFile, string defaultProjectName,
@@ -384,7 +393,7 @@ namespace RePKG.Command
 
         private static PackageFormat GetPackageFormat(Package package)
         {
-            if (package.Magic != null && package.Magic.StartsWith("PKGM"))
+            if (package.Magic != null && package.Magic.StartsWith("PKGM", StringComparison.OrdinalIgnoreCase))
                 return PackageFormat.M;
             return PackageFormat.V;
         }

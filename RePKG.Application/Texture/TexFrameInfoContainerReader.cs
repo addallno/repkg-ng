@@ -79,8 +79,8 @@ namespace RePKG.Application.Texture
 
             // TEXS0001 and TEXS0002 don't save gif width/height so we will get it from first frame
             // Because we use those values in TexToImageConverter
-            if (container.GifWidth == 0 ||
-                container.GifHeight == 0)
+            if ((container.GifWidth == 0 ||
+                container.GifHeight == 0) && container.Frames.Count > 0)
             {
                 container.GifWidth = (int) container.Frames[0].Width;
                 container.GifHeight = (int) container.Frames[0].Height;

@@ -6,8 +6,8 @@ namespace RePKG.Core.Package
     public class PackageEntry
     {
         public string FullPath { get; set; }
-        public int Offset { get; set; }
-        public int Length { get; set; }
+        public long Offset { get; set; }
+        public long Length { get; set; }
         public byte[] Bytes { get; set; }
         public EntryType Type { get; set; }
         

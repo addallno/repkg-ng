@@ -42,20 +42,6 @@ namespace RePKG.Application.Texture
             return JsonConvert.SerializeObject(json, Formatting.Indented);
         }
 
-        private static bool NumberIsPowerOfTwo(int n)
-        {
-            if (n == 0)
-                return false;
-
-            while (n != 1)
-            {
-                if (n % 2 != 0)
-                    return false;
-
-                n /= 2;
-            }
-
-            return true;
-        }
+        private static bool NumberIsPowerOfTwo(int n) => n > 0 && (n & (n - 1)) == 0;
     }
 }
